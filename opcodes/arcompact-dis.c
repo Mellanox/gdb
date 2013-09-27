@@ -82,6 +82,10 @@ static bfd_vma bfd_getm32_ac (unsigned int) ATTRIBUTE_UNUSED;
 #define FIELDC_AC(word)   (BITS ((word), 5, 7))
 #define FIELDU_AC(word)   (BITS ((word), 0, 4))
 
+#ifdef ARC_NPS_CMDS
+#define FIELDB_AC16(word)   (BITS ((word), 24, 26))
+#define FIELDC_AC16(word)   (BITS ((word), 21, 23))
+#endif // #ifdef ARC_NPS_CMDS
 /*
  * FIELDS_AC is the 11-bit signed immediate value used for
  * GP-relative instructions.
@@ -252,12 +256,30 @@ static bfd_vma bfd_getm32_ac (unsigned int) ATTRIBUTE_UNUSED;
 	}				  	\
 	}
 
+#ifdef ARC_NPS_CMDS
+#define FIELD_C_AC16() {				\
+	fieldC = FIELDC_AC16(state->words[0]);	\
+	if (fieldC > 3) {  			\
+	  fieldC += 8;  			\
+	}				  	\
+	}
+#endif // #ifdef ARC_NPS_CMDS
+
 #define FIELD_B_AC() {				\
 	fieldB = FIELDB_AC(state->words[0]);	\
 	if (fieldB > 3) {  			\
 	  fieldB += 8; 				\
 	}				  	\
 	}
+
+#ifdef ARC_NPS_CMDS
+#define FIELD_B_AC16() {				\
+	fieldB = FIELDB_AC16(state->words[0]);	\
+	if (fieldB > 3) {  			\
+	  fieldB += 8; 				\
+	}				  	\
+	}
+#endif // #ifdef ARC_NPS_CMDS
 
 #define FIELD_A_AC() {				\
 	fieldA = FIELDA_AC(state->words[0]);	\
@@ -590,10 +612,18 @@ write_comments_(struct arcDisState *state, int shimm ATTRIBUTE_UNUSED,
 
 static const char *condName[] =
 {
+#ifdef ARC_NPS_CMDS
+  /* 0..31. */
+  ""    , "z"  , "nz" , "p"  , "n"  , "c"  , "nc" , "v"  ,
+  "nv"  , "gt" , "ge" , "lt" , "le" , "hi" , "ls" , "pnz",
+  "ss"  , "sc" , "lb",  "lb2", "olb", "nj" , "at" , "nm",
+  "nt" , "?25", "?26", "?27", "?28", "?29", "?30", "?31",
+#else	// #ifdef ARC_NPS_CMDS
   /* 0..15. */
   ""   , "z"  , "nz" , "p"  , "n"  , "c"  , "nc" , "v"  ,
   "nv" , "gt" , "ge" , "lt" , "le" , "hi" , "ls" , "pnz",
   "ss" , "sc"
+#endif // #ifdef ARC_NPS_CMDS
 
 };
 
@@ -615,7 +645,11 @@ write_instr_name_(struct arcDisState *state,
       int condlim = 0; /* condition code limit*/
       const char *cc = 0;
       if (!condCodeIsPartOfName) strcat(state->instrBuffer, ".");
+#ifdef ARC_NPS_CMDS
+      condlim = 32;
+#else // #ifdef ARC_NPS_CMDS
       condlim = 18;
+#endif // #ifdef ARC_NPS_CMDS
       if (cond < condlim)
 	cc = condName[cond];
       else
@@ -623,6 +657,16 @@ write_instr_name_(struct arcDisState *state,
       if (!cc) cc = "???";
       strcat(state->instrBuffer, cc);
     }
+#ifdef ARC_NPS_CMDS
+  if ( !strcmp(instrName,"crc16") || !strcmp(instrName,"crc32") )
+    {
+      if (flag) strcat(state->instrBuffer, ".r");
+    }
+  else if ( !strcmp(instrName,"zncv") )
+         if (flag) strcat(state->instrBuffer, ".wr");
+         else strcat(state->instrBuffer, ".rd");
+  else
+#endif
   if (flag) strcat(state->instrBuffer, ".f");
   if (branchPrediction == 1)
     strcat(state->instrBuffer, ".t");
@@ -651,8 +695,13 @@ enum
 {
   op_BC = 0, op_BLC = 1, op_LD  = 2, op_ST = 3, op_MAJOR_4  = 4,
   /* START ARC LOCAL */
+#ifdef ARC_NPS_CMDS
+  op_MAJOR_5 = 5, op_MAJOR_6 = 6, op_USER_7 = 7, op_MAJOR_8 = 8, op_USER_9 = 9, op_USER_10 = 10,
+  op_USER_11 = 11, op_LD_ADD = 12, op_ADD_SUB_SHIFT  = 13,
+#else
   op_MAJOR_5 = 5, op_MAJOR_6 = 6, op_MAJOR_8 = 8, op_SIMD=9, op_LD_ST = 10,
   op_JLI_EI = 11, op_LD_ADD = 12, op_ADD_SUB_SHIFT  = 13,
+#endif  // #ifdef ARC_NPS_CMDS
   /* END ARC LOCAL */
   op_ADD_MOV_CMP = 14, op_S = 15, op_LD_S = 16, op_LDB_S = 17,
   op_LDW_S = 18, op_LDWX_S  = 19, op_ST_S = 20, op_STB_S = 21,
@@ -703,6 +752,25 @@ sign_extend (int value, int bits)
   return value;
 }
 
+#ifdef ARC_NPS_CMDS
+static void checkAdd_e(int type,char *str)
+{
+	switch ( type ) {
+		case  3:
+		case  7:
+		case 12:
+		case 13:
+		case 14:
+		case 15:
+			strcat(str,".e");
+			break;
+		default:
+			break;
+	}
+	return;
+}
+#endif // #ifdef ARC_NPS_CMDS
+
 /* dsmOneArcInst - This module is used to identify the instruction
  *		   and to decode them based on the ARCtangent-A5
  *                 instruction set architecture.
@@ -734,6 +802,9 @@ dsmOneArcInst (bfd_vma addr, struct arcDisState *state, disassemble_info * info)
   int usesSimdRegA= 0, usesSimdRegB=0, usesSimdRegC=0,simd_scale_u8=-1;
   int flags = !E_ARC_MACH_A4;
   char formatString[60];
+#ifdef ARC_NPS_CMDS
+  int  ldbitCmd = 0;
+#endif // #ifdef ARC_NPS_CMDS
 
   state->nullifyMode = BR_exec_when_no_jump;
   state->isBranch = 0;
@@ -836,6 +907,9 @@ dsmOneArcInst (bfd_vma addr, struct arcDisState *state, disassemble_info * info)
     case op_LD:
     /* Load register with offset [major opcode 2]  */
       decodingClass = 6;
+#ifdef ARC_NPS_CMDS
+      ldbitCmd = 0;
+#endif // #ifdef ARC_NPS_CMDS
       switch (BITS(state->words[0],7,8))
       {
 	case 0: instrName  = "ld";  state->_load_len = 4; break;
@@ -847,7 +921,11 @@ dsmOneArcInst (bfd_vma addr, struct arcDisState *state, disassemble_info * info)
 	    instrName  = "ldw";
 	  state->_load_len = 2;
 	  break;
+#ifdef ARC_NPS_CMDS
+	case 3: instrName  = "ldbit.di";  ldbitCmd = 1; state->_load_len = 4; break;
+#else
 	case 3: instrName  = "ldd";  state->_load_len = 4; break;
+#endif // #ifdef ARC_NPS_CMDS
 	default:
 	  instrName = "??? (0[3])";
 	  state->flow = invalid_instr;
@@ -1060,12 +1138,19 @@ dsmOneArcInst (bfd_vma addr, struct arcDisState *state, disassemble_info * info)
       {
 	subopcode = BITS(state->words[0],17,21);
 	decodingClass = 5;
+#ifdef ARC_NPS_CMDS
+	ldbitCmd = 0;
+#endif // #ifdef ARC_NPS_CMDS
 	switch (subopcode)
 	{
 	  case 24: instrName  = "ld";   state->_load_len = 4; break;
 	  case 25: instrName  = "ldb";  state->_load_len = 1; break;
 	  case 26: instrName  = "ldw";  state->_load_len = 2; break;
+#ifdef ARC_NPS_CMDS
+	  case 27: instrName  = "ldbit.di"; ldbitCmd = 1; state->_load_len = 4; break;
+#else
 	  case 27: instrName  = "ldd";   state->_load_len = 4; break;
+#endif // #ifdef ARC_NPS_CMDS
 	  default:
 	    instrName = "??? (0[3])";
 	    state->flow = invalid_instr;
@@ -1297,6 +1382,7 @@ dsmOneArcInst (bfd_vma addr, struct arcDisState *state, disassemble_info * info)
   /* END ARC LOCAL */
 
     /* Aurora SIMD instruction support*/
+#ifndef ARC_NO_SIMD_CMDS
   case op_SIMD:
 
     if (enable_simd)
@@ -2284,6 +2370,381 @@ dsmOneArcInst (bfd_vma addr, struct arcDisState *state, disassemble_info * info)
 	  }
       }
     break;
+#endif  // #ifndef ARC_NO_SIMD_CMDS
+
+#ifdef ARC_NPS_CMDS
+  case op_USER_7:
+  /* ARC 32-bit basecase instructions with 3 Operands */
+    decodingClass = 0;  /* Default for 3 operand instructions */
+    subopcode = BITS(state->words[0],16,21);
+    switch (subopcode)
+    {
+      case 0x2f:
+    	  decodingClass = 1;
+          switch (BITS(state->words[0],0,5)) { /* Checking based on Subopcode2 */
+    	      case 0: instrName = "dctcp";  break;
+    	      case 1: instrName = "dcip";  break;
+    	      case 2: instrName = "dcet";  break;
+    	      case 3: instrName = "hwschd.restore" ; decodingClass = 73; break;
+    	      case 4:
+    	    	  decodingClass = 26;
+    	    	  switch ( BITS(state->words[0],6,11) ) {
+    	    	      case 0: instrName = "schd.rw";  break;
+    	    	      case 1: instrName = "schd.wft";  break;
+    	    	      case 2: instrName = "schd.rd";  break;
+    	    	      default: instrName = "schd.??";  break;
+    	    	  }
+    	    	  break;
+        	  case 5: instrName = "lbdsize";  break;
+        	  case 0x24: instrName = "getsti"; decodingClass = 86; break;
+        	  case 0x25: instrName = "getrtc"; decodingClass = 86; break;
+    	      case 0x20: instrName = "jobget" ; decodingClass = 79; break;
+       	      case 0x21: instrName = "jobget.cl" ; decodingClass = 79; break;
+    	      case 0x3f:
+    	    	  switch ( BITS(state->words[0],6,11) ) {
+    	    	  	  case 0:
+    	    	  		  decodingClass = 26;
+    	    	  		  switch ( BITS(state->words[0],24,26) ) {
+    	    	  		  	  case 0: instrName = "sync.rd";  break;
+    	    	  		  	  case 1: instrName = "sync.wr";  break;
+    	    	  		  	  default: instrName = "sync.??";  break;
+    	    	  		  }
+    	    	  		  break;
+        	    	  case 2: instrName = "hwschd.off" ; decodingClass = 73; break;
+        	    	  case 3: instrName = "cnljob" ; decodingClass = 73; break;
+    	    	  	  default: instrName = "???3f"; 	state->flow=invalid_instr; 		break;
+
+    	    	  }
+    	    	  break;
+	          default: 	instrName = "???2f"; 	state->flow=invalid_instr; 		break;
+	      }
+	      break;
+
+      case 0x10: instrName = "bdalc"; decodingClass = 65; break;
+      case 0x11: instrName = "bdfre"; decodingClass = 65; break;
+      case 0x12: instrName = "jobdn"; decodingClass = 65; break;
+      case 0x13: instrName = "ldjob"; decodingClass = 65; break;
+      case 0x14: instrName = "stjob"; decodingClass = 65; break;
+      case 0x15: instrName = "whash"; decodingClass = 65; break;
+      case 0x16: instrName = "asri"; decodingClass = 69; break;
+      case 0x17: instrName = "sbdfre"; decodingClass = 0; break;
+      case 0x18: instrName = "bdbgt"; decodingClass = 0; break;
+      case 0x19: instrName = "idxbgt"; decodingClass = 0; break;
+      case 0x1A: instrName = "jobbgt"; decodingClass = 0; break;
+
+      case 0x20: instrName = "dcet"; decodingClass = 62; break;
+      case 0x21: instrName = "tr"; decodingClass = 0; break;
+      case 0x22: instrName = "utf8"; decodingClass = 0; break;
+      case 0x23: instrName = "addf"; decodingClass = 0; break;
+      case 0x25: instrName = "dcacl"; decodingClass = 0; break;
+      case 0x26: instrName = "idxalc"; decodingClass = 65; break;
+      case 0x27: instrName = "sidxfre"; decodingClass = 65; break;
+      case 0x28: instrName = "idxfre"; decodingClass = 65; break;
+      case 0x29: instrName = "dcip"; decodingClass = 82; break;
+      case 0x2A: instrName = "csma"; decodingClass = 0; break;
+      case 0x2B: instrName = "jobalc"; decodingClass = 65; break;
+      case 0x2C: instrName = "csms"; decodingClass = 0; break;
+      case 0x2D: instrName = "cbba"; decodingClass = 0; break;
+      case 0x2E: instrName = "rflt"; decodingClass = 0; break;
+      case 0x30:
+    	  decodingClass = 26;
+    	  switch ( BITS(state->words[0],6,11) ) {
+    	  	  case 0: instrName = "wkup"; decodingClass = 69; break;
+    	  	  case 4: instrName = "wkup.cl"; break;
+    	  	  default: instrName = "wkup.???"; break;
+    	  }
+    	  break;
+      case 0x31: instrName = "lkpitcm"; decodingClass = 84; break;
+      case 0x32: instrName = "lkpetcm"; decodingClass = 84; break;
+      case 0x33: instrName = "crc16"; decodingClass = 0; break;
+      case 0x34: instrName = "crc32"; decodingClass = 0; break;
+      case 0x35: instrName = "zncv"; decodingClass = 0; break;
+      case 0x36: instrName = "hofs"; decodingClass = 82; break;
+      default:
+	       instrName = "???7";
+	       state->flow=invalid_instr;
+	       break;
+    }
+    break;
+  case op_USER_9:
+    /* ARCompact 16-bit instructions, General ops/ single ops */
+      switch(BITS(state->words[0],16,20))
+      {
+        case 16:
+        case  0:
+        	subopcode = BITS(state->words[0],0,4);
+        	switch (subopcode) {
+      	      case 0:
+      		       instrName = "addb"; decodingClass = 60; break;
+    	      case 1:
+    		       instrName = "andb"; decodingClass = 60; break;
+    	      case 2:
+    		       instrName = "xorb"; decodingClass = 60; break;
+    	      case 3:
+    		       instrName = "orb"; decodingClass = 60; break;
+    	      case 4:
+    		       instrName = "subb"; decodingClass = 60; break;
+    	      case 5:
+    		       instrName = "adcb"; decodingClass = 60; break;
+    	      case 6:
+    		       instrName = "sbcb"; decodingClass = 60; break;
+    	      case 7:
+    		       instrName = "fxorb"; decodingClass = 60; break;
+    	      case 8:
+    		       instrName = "wxorb"; decodingClass = 60; break;
+    	      case 9:
+    		       instrName = "notb"; decodingClass = 60; break;
+    	      case 10:
+    		       instrName = "cntbb"; decodingClass = 60; break;
+    	      case 11:
+    		       instrName = "shlb"; decodingClass = 60; break;
+    	      case 12:
+    		       instrName = "shrb"; decodingClass = 60; break;
+    	      case 13:
+    		       instrName = "div"; decodingClass = 61; break;
+    	      case 14:
+    		       instrName = "qcmp.ar"; decodingClass = 74; break;
+    	      case 15:
+    		       instrName = "qcmp.al"; decodingClass = 74; break;
+       	      case 16:
+        		   instrName = "calcsd"; decodingClass = 60; break;
+       	      case 17:
+        		   instrName = "andab"; decodingClass = 81; break;
+       	      case 18:
+        		   instrName = "orab"; decodingClass = 81; break;
+       	      case 19:
+        		   instrName = "bdlen"; decodingClass = 80; break;
+             default:
+  	               instrName = "??? (2[3])";
+  	               state->flow = invalid_instr;
+  	               break;
+       	    }
+            break;
+        case 17:
+        case  1:
+                  instrName = "movb"; decodingClass = 55; break;
+        case 19:
+        case  3:
+                  instrName = "decode1"; decodingClass = 55; break;
+        case 20:
+        case  4:
+                  instrName = "encode"; decodingClass = 55; break;
+        case  5:
+        	subopcode = BITS(state->words[0],0,2);
+        	switch (subopcode) {
+      	      case 0:
+      	    	   instrName = "encr"; decodingClass = 78; break;
+      	      case 1:
+      		       instrName = "decr"; decodingClass = 78; break;
+      	      case 2:
+      		       instrName = "shash"; decodingClass = 78; break;
+      	      case 3:
+      		       instrName = "expskey"; decodingClass = 78; break;
+      	      case 4:
+      		       instrName = "wrkey"; decodingClass = 78; break;
+      	      case 5:
+      		       instrName = "gcm.fin"; decodingClass = 78; break;
+      	      case 6:
+      		       instrName = "gensiv"; decodingClass = 78; break;
+              default:
+  	               instrName = "??? (2[3])";
+  	               state->flow = invalid_instr;
+  	               break;
+       	    }
+        	break;
+        case  6:
+        case 22:
+            subopcode = BITS(state->words[0],0,4);
+            switch (subopcode) {
+            case 0:
+          	   instrName = "xex"; decodingClass = 75; break;
+            case 1:
+          	   instrName = "exc"; decodingClass = 75; break;
+            case 2:
+          	   instrName = "aadd"; decodingClass = 75; break;
+            case 3:
+          	   instrName = "adadd"; decodingClass = 75; break;
+            case 4:
+          	   instrName = "aand"; decodingClass = 75; break;
+            case 5:
+          	   instrName = "aor"; decodingClass = 75; break;
+            case 6:
+          	   instrName = "axor"; decodingClass = 75; break;
+            case 7:
+          	   instrName = "xst"; decodingClass = 75; break;
+            case 8:
+          	   instrName = "pcrcycl.cl"; decodingClass = 75; break;
+            case 9:
+           	   instrName = "cbclr"; decodingClass = 75; break;
+            case 10:
+           	   instrName = "cbset"; decodingClass = 75; break;
+            case 11:
+           	   instrName = "cbcswp"; decodingClass = 75; break;
+            case 12:
+           	   instrName = "cbwr"; decodingClass = 75; break;
+            case 13:
+           	   instrName = "cbrd"; decodingClass = 75; break;
+            case 14:
+           	   instrName = "crd"; decodingClass = 75; break;
+            case 15:
+           	   instrName = "cld"; decodingClass = 75; break;
+            case 16:
+          	   instrName = "atst"; decodingClass = 75; break;
+            case 17:
+          	   instrName = "ari"; decodingClass = 75; break;
+            case 18:
+          	   instrName = "ardc"; decodingClass = 75; break;
+            case 19:
+          	   instrName = "aric"; decodingClass = 75; break;
+            case 20:
+          	   instrName = "aric.r"; decodingClass = 75; break;
+            case 21:
+          	   instrName = "arcl"; decodingClass = 75; break;
+            case 22:
+          	   instrName = "xld"; decodingClass = 75; break;
+            case 23:
+           	   instrName = "cmld"; decodingClass = 75; break;
+            case 24:
+           	   instrName = "cmst"; decodingClass = 75; break;
+            case 25:
+           	   instrName = "cminit"; decodingClass = 75; break;
+            case 26:
+           	   instrName = "cminit.rst"; decodingClass = 75; break;
+            case 27:
+           	   instrName = "cwrdb"; decodingClass = 75; break;
+            case 28:
+           	   instrName = "cwrde"; decodingClass = 75; break;
+            case 30:
+            	instrName = "cwcfg"; decodingClass = 75; break;
+            case 31:
+            	instrName = "cwchk"; decodingClass = 75; break;
+            default:
+	               instrName = "??? (2[3])";
+	               state->flow = invalid_instr;
+	               break;
+            }
+            break;
+        case 7:
+        		  instrName = "ld16.phy"; decodingClass = 77; break;
+        case 24:
+            	  instrName = "movh.cl"; decodingClass = 54; break;
+        case  8:
+                  instrName = "movh"; decodingClass = 54; break;
+        case 25:
+                  instrName = "movl.cl"; decodingClass = 54; break;
+        case 9:
+                  instrName = "movl"; decodingClass = 54; break;
+        case 26:
+        case 10:
+                  instrName = "addl"; decodingClass = 54; break;
+        case 27:
+        case 11:
+                  instrName = "subl"; decodingClass = 54; break;
+        case 28:
+        case 12:
+                  instrName = "orl"; decodingClass = 54; break;
+        case 29:
+        case 13:
+                  instrName = "andl"; decodingClass = 54; break;
+        case 30:
+        case 14:
+                  instrName = "xorl"; decodingClass = 54; break;
+        case 31:
+        case 15:
+                  instrName = "movbi"; decodingClass = 64; break;
+        case 18:
+        case  2:
+                  instrName = "mcmp"; decodingClass = 68; break;
+
+
+        default:
+	              instrName = "??? (2[3])";
+	              state->flow = invalid_instr;
+	              break;
+      }
+      break;
+
+    case op_USER_10:
+    /* ARCompact 16-bit instructions, General ops/ single ops */
+      switch(BITS(state->words[0],0,4))
+      {
+/* case 0 for commands dcmac(l),dcipv4(l),dcipv6(l),dcmpls(l),dcudpl,dctcpl,dcgrel,dcmiml */
+      case 0:  instrName = "dcmac"; decodingClass = 67; break;
+/* case 1 for commands cpb2b,cpb2p,cpp2b,ldbd,stbd,ldjd,stjd */
+      case 1:  instrName = "cpb2b"; decodingClass = 66; break;
+/* case 2 for commands cpb2b.l,cpb2p.l,cpp2b.l,ldbd.l,stbd.l,cpp2p.l,ldphy.l,stphy.l,ldsd */
+      case 2:  instrName = "cpb2b.l"; decodingClass = 66; break;
+/* case 3 for commands cp,cpp2p,ldphy,stphy */
+      case 3:  instrName = "cpp2p"; decodingClass = 66; break;
+/* case 4 for commands cp */
+      case 4:  instrName = "cp"; decodingClass = 85; break;
+/* case 5 for commands mmnt */
+      case 5:  instrName = "mmnt"; decodingClass = 87; break;
+/* case 8 for commands gmsg */
+      case 8:  instrName = "gmsg"; decodingClass = 83; break;
+/* case 23 for commands gets_0 */
+      case 23:  instrName = "gets_0"; decodingClass = 76; break;
+/* case 25 for statistic commands */
+      case 25: instrName = "scrst_0"; decodingClass = 76; break;
+/* case 27 for commands add_0 */
+      case 27:  instrName = "add_0"; decodingClass = 76; break;
+/* case 28 for commands rmv_0 */
+      case 28:  instrName = "rmv_0"; decodingClass = 76; break;
+/* case 29 for commands upd_0 */
+      case 29:  instrName = "upd_0"; decodingClass = 76; break;
+/* case 30 for commands lkp_0 */
+      case 30:  instrName = "lkp_0"; decodingClass = 76; break;
+      default:
+	  instrName = "??? (2[3])";
+	  state->flow = invalid_instr;
+	  break;
+      }
+      break;
+
+    case op_USER_11:
+
+   /* ARCompact 16-bit instructions, General ops/ single ops */
+      if (state->instructionLen == 2) {
+       switch(BITS(state->words[0],0,4))
+        {
+          case  0: instrName = "mov2b"; decodingClass = 57; break;
+          case  1: instrName = "ext4b"; decodingClass = 59; break;
+          case  2: instrName = "ins4b"; decodingClass = 59; break;
+          case  3: instrName = "mrgb";  decodingClass = 56; break;
+          default:
+	             instrName = "??? (2[3])";
+	             state->flow = invalid_instr;
+	             break;
+       }
+      }
+      else {
+  /* ARCompact 16-bit instructions, General ops/ single ops */
+        switch(BITS(state->words[0],16,20))
+        {
+          case  8: instrName = "xldb"; decodingClass = 54; break;
+          case  9: instrName = "xldw"; decodingClass = 54; break;
+          case 10: instrName = "xld"; decodingClass = 54; break;
+          case 11: instrName = "mxb";  decodingClass = 70; break;
+          case 12: instrName = "xstb"; decodingClass = 54; break;
+          case 13: instrName = "xstw"; decodingClass = 54; break;
+          case 14: instrName = "xst"; decodingClass = 54; break;
+          case 16:  instrName = "mov4b"; decodingClass = 58; break;
+          case 17:  instrName = "mov4bcl"; decodingClass = 58; break;
+          case 24:  instrName = "hash"; decodingClass = 63; break;
+          case 25:  instrName = "hash.p0"; decodingClass = 63; break;
+          case 26:  instrName = "hash.p1"; decodingClass = 63; break;
+          case 27:  instrName = "hash.p2"; decodingClass = 63; break;
+          case 28:  instrName = "hash.p3"; decodingClass = 63; break;
+          case 29:  instrName = "e4by"; decodingClass = 63; break;
+
+          default:
+	             instrName = "??? (2[3])";
+	             state->flow = invalid_instr;
+	             break;
+        }
+      }
+      break;
+#endif // #ifdef ARC_NPS_CMDS
 
 
     case op_LD_ADD:
@@ -2323,6 +2784,7 @@ dsmOneArcInst (bfd_vma addr, struct arcDisState *state, disassemble_info * info)
       }
     break;
 
+#ifdef NPS_ARCv2
   case op_LD_ST:
     if (BIT(state->words[0],3))
       {
@@ -2350,6 +2812,7 @@ dsmOneArcInst (bfd_vma addr, struct arcDisState *state, disassemble_info * info)
 	instrName = "jli_s";
       }
     break;
+#endif /* #ifdef NPS_ARCv2 */
 
   case op_ADD_MOV_CMP:
     /* One Dest/Source can be any of r0 - r63 */
@@ -2729,10 +3192,12 @@ dsmOneArcInst (bfd_vma addr, struct arcDisState *state, disassemble_info * info)
    * instead of all over this crazy switch case. */
   if (state->flow == invalid_instr)
     {
+#ifndef ARC_NO_SIMD_CMDS
       if (!((state->_opcode == op_SIMD) && enable_simd))
 	instrName = instruction_name(state,state->_opcode,
 				     state->words[0],
 				     &flags);
+#endif // #ifndef ARC_NO_SIMD_CMDS
 
       if (state->instructionLen == 2)
 	{
@@ -2770,8 +3235,10 @@ dsmOneArcInst (bfd_vma addr, struct arcDisState *state, disassemble_info * info)
 	      break;
 	    case AC_SYNTAX_NOP:
 	      break;
+#ifndef ARC_NO_SIMD_CMDS
 	    case AC_SYNTAX_SIMD:
 	      break;
+#endif  // #ifndef ARC_NO_SIMD_CMDS
 	    default:
 	      mwerror(state, "Invalid syntax class\n");
 	    }
@@ -2896,7 +3363,6 @@ dsmOneArcInst (bfd_vma addr, struct arcDisState *state, disassemble_info * info)
 	  CHECK_FLAG_COND();
 	  break;
       }
-
       write_instr_name();
       WRITE_FORMAT_x(A);
       WRITE_FORMAT_COMMA_x(B);
@@ -3117,7 +3583,13 @@ dsmOneArcInst (bfd_vma addr, struct arcDisState *state, disassemble_info * info)
       if (fieldCisReg) state->ea_reg2 = fieldC; else state->_offset += fieldC;
       state->_mem_load = 1;
 
+#ifndef ARC_NPS_CMDS
       directMem     = BIT(state->words[0],15);
+#else
+	  if (ldbitCmd == 0) {
+           directMem     = BIT(state->words[0],15);
+	  }
+#endif // #ifndef ARC_NPS_CMDS
       /* - We should display the instruction as decoded, not some censored
 	   version of it
 	 - Scaled index is encoded as 'addrWriteBack', even though it isn't
@@ -3128,9 +3600,29 @@ dsmOneArcInst (bfd_vma addr, struct arcDisState *state, disassemble_info * info)
       if (fieldBisReg && (fieldB != 62))
 #endif
 	addrWriteBack = BITS(state->words[0],22,23);
+#ifndef ARC_NPS_CMDS
       signExtend    = BIT(state->words[0],16);
+#else
+	  if (ldbitCmd == 0) {
+		  signExtend    = BIT(state->words[0],16);
+	  }
+	  else {
+		  addrWriteBack = 0;
+		  switch (BITS(state->words[0],22,23)) {
+	          case 0: instrName  = "ldbit.di"; break;
+	          case 1: instrName  = "ldbit.x2.di"; break;
+	          case 2: instrName  = "ldbit.x4.di"; break;
+	          case 3: instrName  = "ldbit.??.di"; break;
+		  }
+	  }
+#endif // #ifndef ARC_NPS_CMDS
 
       write_instr_name();
+#ifdef ARC_NPS_CMDS
+      if ( (ldbitCmd != 0) && ( BIT(state->words[0],16) != 0) ){
+    	  strcat(state->instrBuffer,".cl");
+      }
+#endif // #ifdef ARC_NPS_CMDS
 
       /* Check for prefetch or ld 0,...*/
       if(IS_REG(A))
@@ -3172,19 +3664,59 @@ dsmOneArcInst (bfd_vma addr, struct arcDisState *state, disassemble_info * info)
       state->_ea_present = 1;
       state->_offset = fieldC;
       state->_mem_load = 1;
+#ifndef ARC_NPS_CMDS
       if (fieldBisReg) state->ea_reg1 = fieldB;
       /* field B is either a shimm (same as fieldC) or limm (different!) */
       /* Say ea is not present, so only one of us will do the name lookup. */
       else state->_offset += fieldB, state->_ea_present = 0;
 
       directMem     = BIT(state->words[0],11);
+#else
+      if (fieldBisReg) {
+    	  state->ea_reg1 = fieldB;
+    	  if (ldbitCmd == 0) {
+              directMem     = BIT(state->words[0],11);
+    	  }
+      }
+      /* field B is either a shimm (same as fieldC) or limm (different!) */
+      /* Say ea is not present, so only one of us will do the name lookup. */
+      else {
+    	  if (ldbitCmd == 0) {
+              state->_offset += fieldB;
+              directMem     = BIT(state->words[0],11);
+   	      }
+    	  else {
+              state->_offset = fieldB;
+    	  }
+   	      state->_ea_present = 0;
+      }
+#endif // #ifndef ARC_NPS_CMDS
       /* Check if address writeback is allowed before decoding the
 	 address writeback field of a load instruction.*/
       if (fieldBisReg && (fieldB != 62))
 	addrWriteBack = BITS(state->words[0],9,10);
+#ifndef ARC_NPS_CMDS
       signExtend    = BIT(state->words[0],6);
 
       write_instr_name();
+#else
+	  if (ldbitCmd == 0) {
+		  signExtend    = BIT(state->words[0],6);
+	  }
+	  else {
+		  addrWriteBack = 0;
+		  switch (BITS(state->words[0],9,10)) {
+	          case 0: instrName  = "ldbit.di"; break;
+	          case 1: instrName  = "ldbit.x2.di"; break;
+	          case 2: instrName  = "ldbit.x4.di"; break;
+	          case 3: instrName  = "ldbit.??.di"; break;
+		  }
+	  }
+      write_instr_name();
+      if ( (ldbitCmd != 0) && ( BIT(state->words[0],6) != 0) ) {
+    	  strcat(state->instrBuffer,".cl");
+      }
+#endif // #ifndef ARC_NPS_CMDS
       if(IS_REG(A))
 	WRITE_FORMAT_x_COMMA_LB(A);
       else
@@ -3195,12 +3727,28 @@ dsmOneArcInst (bfd_vma addr, struct arcDisState *state, disassemble_info * info)
       if (!fieldBisReg)
 	{
 	  fieldB = state->_offset;
+#ifdef ARC_NPS_CMDS
+	  if (ldbitCmd) {
+		  WRITE_FORMAT_x(B);
+		  if(fieldC != 0)
+			  WRITE_FORMAT_COMMA_x_RB(C);
+		  else
+			  WRITE_FORMAT_RB();
+	  }
+	  else {
+		  WRITE_FORMAT_x_RB(B);
+	  }
+#else
 	  WRITE_FORMAT_x_RB(B);
+#endif // #ifdef ARC_NPS_CMDS
 	}
       else
 	{
 	  WRITE_FORMAT_x(B);
-	  WRITE_FORMAT_COMMA_x_RB(C);
+	  if(fieldC != 0)
+		  WRITE_FORMAT_COMMA_x_RB(C);
+	  else
+		  WRITE_FORMAT_RB();
 	}
       my_sprintf(state, state->operandBuffer, formatString, fieldA, fieldB, fieldC);
       write_comments();
@@ -4001,6 +4549,15 @@ dsmOneArcInst (bfd_vma addr, struct arcDisState *state, disassemble_info * info)
   	  FIELD_B();
   	  fieldA=fieldB;
       /* The source operand has no use.  */
+#ifdef ARC_NPS_CMDS
+      FIELD_B();
+      fieldC = fieldCisReg = 0;
+      write_instr_name();
+      WRITE_FORMAT_x(B);
+      WRITE_FORMAT_COMMA_x(C);
+      WRITE_NOP_COMMENT();
+      my_sprintf(state, state->operandBuffer, formatString, fieldB,fieldC);
+#else
       fieldB = fieldBisReg = 0;
 
       write_instr_name();
@@ -4009,6 +4566,7 @@ dsmOneArcInst (bfd_vma addr, struct arcDisState *state, disassemble_info * info)
       WRITE_NOP_COMMENT();
       my_sprintf(state, state->operandBuffer, formatString, fieldA,
 		 fieldB);
+#endif
       break;
   /* END ARC LOCAL */
 
@@ -4265,6 +4823,7 @@ dsmOneArcInst (bfd_vma addr, struct arcDisState *state, disassemble_info * info)
       my_sprintf(state, state->operandBuffer, formatString, fieldC, fieldB, fieldA);
       break;
 
+#ifdef NPS_ARCv2
     case 51:
 
       /* Only EM!*/
@@ -4469,6 +5028,2841 @@ dsmOneArcInst (bfd_vma addr, struct arcDisState *state, disassemble_info * info)
     WRITE_FORMAT_x_RB(C);
     my_sprintf(state, state->operandBuffer, formatString, fieldB, fieldC);
     break;
+#endif /* #ifdef NPS_ARCv2 */
+
+#ifdef ARC_NPS_CMDS
+  case 51:
+    {
+        int v;
+      /* ARCompact 16-bit instructions, + short int */
+
+        FIELD_C_AC16();
+        FIELD_B_AC16();
+        write_instr_name();
+        v = state->words[0] & 0x0000FFFF;
+        strcat(formatString,"%r,%r,%r,0x%04x");
+        my_sprintf(state, state->operandBuffer, formatString, fieldB, fieldB, fieldC,v);
+        break;
+    }
+
+  case 52:
+    {
+      /* ARCompact 16-bit instructions, + long int */
+
+        FIELD_C_AC();
+        FIELD_B_AC();
+        fieldA = 62;
+        CHECK_FIELD(fieldA);
+        write_instr_name();
+        strcat(formatString,"%r,%r,%r,0x%08x");
+        my_sprintf(state, state->operandBuffer, formatString, fieldB, fieldB, fieldC,limm_value);
+        break;
+    }
+  case 53:
+    {
+        int v;
+      /* ARCompact 16-bit instructions, + short int */
+
+        FIELD_C_AC16();
+        FIELD_B_AC16();
+        fieldA = 62;
+        CHECK_FIELD(fieldA);
+        write_instr_name();
+        v = state->words[0] & 0x0000FFFF;
+        strcat(formatString,"%r,%r,%r,0x%04x,0x%08x");
+        my_sprintf(state, state->operandBuffer, formatString, fieldB, fieldB, fieldC,v,limm_value);
+        break;
+    }
+
+  case 54:
+    {
+        int v;
+        int r;
+        int subOpcode;
+        int major;
+        FIELD_C_AC16();
+        FIELD_B_AC16();
+        if ( fieldB > 3 ) fieldB -= 8;
+        if ( fieldC > 3 ) fieldC -= 8;
+        subOpcode = (state->words[0] & 0x000f0000) >> 16;
+        major = (state->words[0] & 0xf8000000) >> 27;
+        v = state->words[0] & 0x0000FFFF;
+        if ( ( v & 0x00008000 ) != 0 ) v |= 0xffff0000; /* sign extension */
+        r = (fieldB<<3) + fieldC;
+        if ( major == 9 ) {
+            if ( ( (state->words[0] & 0x00100000) != 0 ) && (subOpcode != 8) && (subOpcode != 9) ) flag = 1;
+        }
+        else { /* for all subopcode in major 0xB */
+        	write_instr_name();
+        	if (((BITS(state->words[0],16,20)) >= 8) && ((BITS(state->words[0],16,20)) <= 14)) {
+        		strcat(formatString,"%r,[0x%x]");
+        		v = (VALID_MSB_CCM1 & 0xFFFF0000) | (state->words[0] & 0x0000FFFF);
+        	}
+        	else
+        		strcat(formatString,"%r,[cm:0x%04x]");
+        	my_sprintf(state, state->operandBuffer, formatString, r,v);
+        	break;
+        }
+        write_instr_name();
+        switch (subOpcode) {
+            case 12:  // orl
+            case 13:  // andl
+            case 14:  // xorl
+            	v &= 0x0000FFFF; /* No sign ext. for andl,orl,xorl*/
+            case 10:  // addl
+            case 11:  // subl
+                strcat(formatString,"%r,%r,0x%04x");
+                my_sprintf(state, state->operandBuffer, formatString, r, r,v);
+                break;
+            case 8:  // movh
+            case 9:  // movl
+            	v &= 0x0000FFFF; /* No sign ext. for movl,movh*/
+            	if (strstr(instrName,".cl") == NULL) {
+                    strcat(formatString,"%r,%r,0x%04x");
+                    my_sprintf(state, state->operandBuffer, formatString, r, r,v);
+                    break;
+            	}
+           default:
+                strcat(formatString,"%r,0x%04x");
+                my_sprintf(state, state->operandBuffer, formatString, r,v);
+                break;
+        }
+        break;
+    }
+  case 55:
+    {
+        int v1;
+        int v2;
+        int v3;
+        int subOp;
+        FIELD_C_AC16();
+        FIELD_B_AC16();
+        if ( (state->words[0] & 0x00100000) != 0 ) flag = 1;
+        v1 = (state->words[0] & 0x0000001F) >> 0;
+        v2 = (state->words[0] & 0x000003E0) >> 5;
+        v3 = (state->words[0] & 0x00007C00) >> 10;
+        subOp = (state->words[0] & 0x000F0000) >> 16;
+        switch (subOp) {
+	case 3:
+		if ( ((state->words[0] & 0x00000040) >> 6) == 0 ) {
+			if ( state->words[0] & 0x00008000 )
+				instrName = "fbset";
+			else
+				instrName = "fbclr";
+		}
+		else {
+			if ( (state->words[0] & 0x00000020) != 0 )
+				instrName = "decode1.cl";
+		}
+		break;
+        case 4:
+        	if ( state->words[0] & 0x00008000 )
+        		instrName = "encode1";
+        	else
+        		instrName = "encode0";
+        	break;
+        default:
+        	break;
+        }
+        write_instr_name();
+        if ( state->words[0] & 0x00008000 ) {
+		if ((subOp != 3) && (subOp != 4))
+        		strcat(state->instrBuffer,".cl");
+            switch (subOp) {
+                 case 3:
+                	if ( state->words[0] & 0x00000020 ) {
+                		strcat(formatString,"%r,%r,%d");
+                		my_sprintf(state, state->operandBuffer, formatString, fieldB,fieldC,v1);
+                	 }
+                	 else {
+                		 strcat(formatString,"%r,%r,%r,%d,%d");
+                		 my_sprintf(state, state->operandBuffer, formatString, fieldB,fieldB,fieldC,v1,(v3+1));
+                	 }
+                     break;
+                 case 4:
+                     strcat(formatString,"%r,%r,%d,%d");
+                     my_sprintf(state, state->operandBuffer, formatString, fieldB,fieldC,v1,(v3+1));
+                     break;
+                 default:
+                     strcat(formatString,"%r,%r,%d,%d,%d");
+                     my_sprintf(state, state->operandBuffer, formatString, fieldB,fieldC,v2,v1,(v3+1));
+                     break;
+            }
+        }
+        else {
+            switch (subOp) {
+                case 3:
+                	strcat(formatString,"%r,%r,%r,%d,%d");
+                	my_sprintf(state, state->operandBuffer, formatString, fieldB,fieldB,fieldC,v1,(v3+1));
+                	break;
+                case 4:
+                    strcat(formatString,"%r,%r,%d,%d");
+                    my_sprintf(state, state->operandBuffer, formatString, fieldB,fieldC,v1,(v3+1));
+                    break;
+                default:
+                    strcat(formatString,"%r,%r,%r,%d,%d,%d");
+                    my_sprintf(state, state->operandBuffer, formatString, fieldB,fieldB,fieldC,v2,v1,(v3+1));
+                    break;
+            }
+        }
+        break;
+    }
+  case 56:
+    {
+        int v1;
+        int v2;
+        int v3;
+        int v4;
+        int v5;
+        int v6;
+        FIELD_C_AC();
+        FIELD_B_AC();
+        fieldA = 62; // dummy value only to update limm_value
+        CHECK_FIELD(fieldA);
+        v1 = (limm_value & 0x0000001F) >> 0;
+        v2 = (limm_value & 0x000003E0) >> 5;
+        v5 = (limm_value & 0x00007C00) >> 10;
+        v6 = (limm_value & 0x000F8000) >> 15;
+        v3 = (limm_value & 0x01F00000) >> 20;
+        v4 = (limm_value & 0x3E000000) >> 25;
+        write_instr_name();
+        if ( limm_value & 0x80000000 ) {
+        	strcat(state->instrBuffer,".cl");
+            strcat(formatString,"%r,%r,%r,%d,%d,%d,%d,%d,%d");
+            my_sprintf(state, state->operandBuffer, formatString, fieldB,fieldB,fieldC,v5,v1,(v3+1),v6,v2,(v4+1));
+        }
+        else {
+            strcat(formatString,"%r,%r,%r,%d,%d,%d,%d,%d,%d");
+            my_sprintf(state, state->operandBuffer, formatString, fieldB,fieldB,fieldC,v5,v1,(v3+1),v6,v2,(v4+1));
+        }
+        break;
+    }
+  case 57:
+    {
+        int v1;
+        int v2;
+        int v3;
+        int v4;
+        int v5;
+        int v6;
+        FIELD_C_AC();
+        FIELD_B_AC();
+        fieldA = 62; // dummy value only to update limm_value
+        CHECK_FIELD(fieldA);
+        v1 = (limm_value & 0x0000001F) >> 0;
+        v2 = (limm_value & 0x000003E0) >> 5;
+        v3 = (limm_value & 0x00007C00) >> 10;
+        v4 = (limm_value & 0x000F8000) >> 15;
+        v5 = (limm_value & 0x06000000) >> 25;
+        v6 = (limm_value & 0x18000000) >> 27;
+        write_instr_name();
+        if ( limm_value & 0x80000000 ) {
+        	strcat(state->instrBuffer,".cl");
+            strcat(formatString,"%r,%r,%d,%d,%d,%d,%d,%d");
+            my_sprintf(state, state->operandBuffer, formatString, fieldB,fieldC,v3,v5,v1,v4,v6,v2);
+        }
+        else {
+            strcat(formatString,"%r,%r,%r,%d,%d,%d,%d,%d,%d");
+            my_sprintf(state, state->operandBuffer, formatString, fieldB,fieldB,fieldC,v3,v5,v1,v4,v6,v2);
+        }
+        break;
+    }
+  case 58:
+    {
+        int s1;
+        int s2;
+        int s3;
+        int s4;
+        int d1;
+        int d2;
+        int d3;
+        int d4;
+        int m1;
+        int m2;
+        int m3;
+        int m4;
+        int v16;
+        int mov3bCase = 0;
+        FIELD_C_AC16();
+        FIELD_B_AC16();
+        fieldA = 62; // dummy value only to update limm_value
+        CHECK_FIELD(fieldA);
+        v16 = state->words[0] & 0x0000FFFF;
+        s1 = (limm_value & 0x0000001F) >> 0;
+        s2 = (limm_value & 0x000003E0) >> 5;
+        d1 = (limm_value & 0x00007C00) >> 10;
+        d2 = (limm_value & 0x000F8000) >> 15;
+        s3 = (limm_value & 0x01F00000) >> 20;
+        m1 = (limm_value & 0x06000000) >> 25;
+        m2 = (limm_value & 0x18000000) >> 27;
+        m3 = (limm_value & 0x60000000) >> 29;
+        m4 = ( (limm_value & 0x80000000) >> (31-1) ) | ( (v16 & 0x8000) >> 15 );
+        s4 = (v16 & 0x001F) >> 0;
+        d3 = (v16 & 0x03E0) >> 5;
+        d4 = (v16 & 0x7C00) >> 10;
+        if ( ( d3 == d4 ) && (m4 == 2) ) {
+        	 instrName = (strstr(instrName,"cl") != NULL ) ? "mov3bcl" : "mov3b";
+        	 mov3bCase = 1;
+        }
+        write_instr_name();
+        if (strstr(state->instrBuffer,"cl") != NULL ) {
+        	if ( mov3bCase == 0 ) {
+                strcat(formatString,"%r,%r,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d");
+                my_sprintf(state, state->operandBuffer, formatString, fieldB,fieldC,d1,m1,s1,d2,m2,s2,d3,m3,s3,d4,m4,s4);
+        	}
+        	else {
+                strcat(formatString,"%r,%r,%d,%d,%d,%d,%d,%d,%d,%d,%d");
+                my_sprintf(state, state->operandBuffer, formatString, fieldB,fieldC,d1,m1,s1,d2,m2,s2,d3,m3,s3);
+        	}
+        }
+        else {
+           	if ( mov3bCase == 0 ) {
+                strcat(formatString,"%r,%r,%r,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d");
+                my_sprintf(state, state->operandBuffer, formatString, fieldB,fieldB,fieldC,d1,m1,s1,d2,m2,s2,d3,m3,s3,d4,m4,s4);
+           	}
+           	else {
+                strcat(formatString,"%r,%r,%r,%d,%d,%d,%d,%d,%d,%d,%d,%d");
+                my_sprintf(state, state->operandBuffer, formatString, fieldB,fieldB,fieldC,d1,m1,s1,d2,m2,s2,d3,m3,s3);
+           	}
+        }
+        break;
+    }
+  case 59:
+    {
+        int v1;
+        int v2;
+        int v3;
+        int v4;
+        int v5;
+        int subOpcode;
+        FIELD_C_AC();
+        FIELD_B_AC();
+        fieldA = 62; // dummy value only to update limm_value
+        CHECK_FIELD(fieldA);
+        v1 = (limm_value & 0x0000001F) >> 0;
+        v2 = (limm_value & 0x000003E0) >> 5;
+        v3 = (limm_value & 0x00007C00) >> 10;
+        v4 = (limm_value & 0x000F8000) >> 15;
+        v5 = (limm_value & 0x01F00000) >> 20;
+        subOpcode = BITS(state->words[0],0,4);
+        write_instr_name();
+        if ( subOpcode == 1 ) {
+            if ( limm_value & 0x80000000 ) {
+        	    strcat(state->instrBuffer,".cl");
+                strcat(formatString,"%r,%r,%d,%d,%d,%d,%d");
+                my_sprintf(state, state->operandBuffer, formatString, fieldB,fieldC,v5,v1,v2,v3,v4);
+            }
+            else {
+                strcat(formatString,"%r,%r,%r,%d,%d,%d,%d,%d");
+                my_sprintf(state, state->operandBuffer, formatString, fieldB,fieldB,fieldC,v5,v1,v2,v3,v4);
+            }
+        }
+        if ( subOpcode == 2 ) {
+            if ( limm_value & 0x80000000 ) {
+        	    strcat(state->instrBuffer,".cl");
+                strcat(formatString,"%r,%r,%d,%d,%d,%d,%d");
+                my_sprintf(state, state->operandBuffer, formatString, fieldB,fieldC,v1,v2,v3,v4,v5);
+            }
+            else {
+                strcat(formatString,"%r,%r,%r,%d,%d,%d,%d,%d");
+                my_sprintf(state, state->operandBuffer, formatString, fieldB,fieldB,fieldC,v1,v2,v3,v4,v5);
+            }
+        }
+        break;
+    }
+  case 60:
+    {
+        int size;
+        int s1;
+        int s2;
+        int d;
+        int us;
+        int entry;
+        int mode;
+        FIELD_C_AC16();
+        FIELD_B_AC16();
+    	subopcode = BITS(state->words[0],0,4);
+        if ( (state->words[0] & 0x00100000) != 0 ) flag = 1;
+        size = (state->words[0] & 0x000003E0) >> 5;
+        mode = (state->words[0] & 0x00000060) >> 5;
+        s1 =  (state->words[0] & 0x00000C00) >> 10;
+        s2 =  (state->words[0] & 0x00003000) >> 12;
+        d  =  (state->words[0] & 0x0000C000) >> 14;
+        us =  (state->words[0] & 0x00004000) >> 14;
+        entry = (state->words[0] & 0x00000F00) >> 8;
+        if ( subopcode == 16 ) {
+        	switch (mode) {
+    	        case 0:
+    		        instrName = "calcsd"; break;
+    	        case 1:
+    		        instrName = "calcbsd"; break;
+    	        case 2:
+    		        instrName = "calckey"; break;
+        	}
+        }
+        write_instr_name();
+        switch (subopcode) {
+          case 0: // addb
+          case 4: // subb
+          case 5: // adcb
+          case 6: // sbcb
+        	  if ( us != 0 ) strcat(state->instrBuffer,".sx");
+              strcat(formatString,"%r,%r,%r,%d,%d,%d");
+              my_sprintf(state, state->operandBuffer, formatString, fieldB,fieldB,fieldC,s1*8,s2*8,(size+1));
+              break;
+          case 9: // notb
+              strcat(formatString,"%r,%r,%d,%d");
+              my_sprintf(state, state->operandBuffer, formatString, fieldB,fieldC,s2*8,(size+1));
+              break;
+          case 10: // cntbb
+              strcat(formatString,"%r,%r,%d,%d");
+              my_sprintf(state, state->operandBuffer, formatString, fieldB,fieldC,s2*8,(size+1));
+              break;
+          case 16: // calcsd, calcbsd, calckey
+        	  if ( us != 0 ) strcat(state->instrBuffer,".xd");
+        	  if ( mode == 0 ) {
+                  strcat(formatString,"%r,%r,%r,%d");
+                  my_sprintf(state, state->operandBuffer, formatString, fieldB,fieldB,fieldC,1 << entry);
+
+        	  }
+        	  else {
+                  strcat(formatString,"%r,%r,%r");
+                  my_sprintf(state, state->operandBuffer, formatString, fieldB,fieldB,fieldC);
+        	  }
+              break;
+         default:
+            strcat(formatString,"%r,%r,%r,%d,%d,%d");
+            my_sprintf(state, state->operandBuffer, formatString,fieldB,fieldB,fieldC,s1*8,s2*8,(size+1));
+            break;
+        }
+        break;
+    }
+  case 61:
+    {
+        int imm;
+        int ri;
+        int s1;
+        int s2;
+        int mode;
+        FIELD_C_AC16();
+        FIELD_B_AC16();
+        if ( (state->words[0] & 0x00100000) != 0 ) flag = 1;
+    	imm = BITS(state->words[0],5,8);
+    	ri = BITS(state->words[0],9,9);
+        s1 = BITS(state->words[0],10,11);
+        s2 = BITS(state->words[0],12,13);
+        mode  =  BITS(state->words[0],14,15);
+        switch (mode) {
+        case 0:
+        	instrName = "divm";
+        	break;
+        case 1:
+        	instrName = "div";
+        	break;
+        case 2:
+        	instrName = "mod";
+        	break;
+        case 3:
+        	instrName = "div???";
+        	break;
+        }
+        write_instr_name();
+        if ( ri == 0 ) {
+            strcat(formatString,"%r,%r,%r,%d,%d");
+            my_sprintf(state, state->operandBuffer, formatString, fieldB,fieldB,fieldC,s1*8,s2*8);
+        }
+        else {
+            strcat(formatString,"%r,%r,%d,%d");
+            my_sprintf(state, state->operandBuffer, formatString, fieldB,fieldB,imm,s1*8);
+        }
+        break;
+    }
+  case 62:
+    {
+	    int t0;
+	    int t1;
+	    CHECK_FIELD_A();
+	    CHECK_FIELD_B();
+	    CHECK_FIELD_C();
+	    t0 = limm_value & 0xFFFF;
+	    t1 = (limm_value >> 16) & 0xFFFF;
+	    write_instr_name();
+        WRITE_FORMAT_x(A);
+	    WRITE_FORMAT_COMMA_x(B);
+	    if ( fieldCisReg == 0 ) {
+            strcat(formatString,",0x%04x,0x%04x");
+            my_sprintf(state, state->operandBuffer, formatString, fieldA,fieldB,t0,t1);
+	    }
+	    else {
+	    	WRITE_FORMAT_COMMA_x(C);
+	    	my_sprintf(state, state->operandBuffer, formatString, fieldA,fieldB,fieldC);
+	    }
+        break;
+    }
+  case 63:
+    {
+    	int width5;
+    	int perm3;
+    	int nonlin1;
+    	int base2;
+    	int index1_3;
+    	int index0_3;
+    	int subOpcode;
+    	subOpcode = BITS(state->words[0],16,20);
+    	fieldB = BITS(state->words[0],24,26);
+    	if ( fieldB >=4 ) fieldB += 8;
+     	fieldC = BITS(state->words[0],21,23);
+    	if ( fieldC >=4 ) fieldC += 8;
+    	fieldA = BITS(state->words[0],11,15);
+    	width5 = BITS(state->words[0],6,10);
+    	nonlin1 = BITS(state->words[0],5,5);
+    	perm3 = BITS(state->words[0],2,4);
+    	base2 = BITS(state->words[0],0,1);
+    	index1_3 = BITS(state->words[0],5,7);
+    	index0_3 = BITS(state->words[0],8,10);
+        write_instr_name();
+        WRITE_FORMAT_x(A);
+	    WRITE_FORMAT_COMMA_x(B);
+	    WRITE_FORMAT_COMMA_x(C);
+        strcat(formatString,",%d,%d,%d,%d");
+        switch (subOpcode) {
+            case 24:
+        	    my_sprintf(state, state->operandBuffer, formatString, fieldA, fieldB, fieldC,width5+1,perm3,nonlin1,base2);
+        	    break;
+            case 25:
+            case 26:
+            case 27:
+            case 28:
+        	    my_sprintf(state, state->operandBuffer, formatString, fieldA, fieldB, fieldC,width5+1,perm3+1,base2,nonlin1);
+        	    break;
+            case 29:
+        	    my_sprintf(state, state->operandBuffer, formatString, fieldA, fieldB, fieldC,index0_3,index1_3,perm3,base2+4);
+        	    break;
+        }
+        break;
+    }
+  case 64:
+    {
+        int r;
+        int cl;
+        int imm;
+        int dst;
+        int size;
+        FIELD_C_AC16();
+        FIELD_B_AC16();
+        if ( fieldB > 3 ) fieldB -= 8;
+        if ( fieldC > 3 ) fieldC -= 8;
+        if ( (state->words[0] & 0x00100000) != 0 ) flag = 1;
+        cl = (state->words[0] & 0x00008000) ? 1 : 0;
+        r = (fieldB<<3) + fieldC;
+        imm = (state->words[0] & 0x0000001F) | ( (state->words[0] & 0x00007000) >> (12-5));
+        dst = (state->words[0] & 0x000003E0) >> 5;
+        size = (state->words[0] & 0x00000C00) >> 10;
+        size = 1 << size;
+        write_instr_name();
+        if (cl != 0) {
+        	strcat(state->instrBuffer,".cl");
+            strcat(formatString,"%r,%d,%d,%d");
+            my_sprintf(state, state->operandBuffer, formatString, r,imm,dst,size);
+        }
+        else {
+            strcat(formatString,"%r,%r,%d,%d,%d");
+            my_sprintf(state, state->operandBuffer, formatString, r, r,imm,dst,size);
+        }
+        break;
+    }
+  case 65:
+    {
+    	int ib;
+    	int c;
+       	int num2;
+       	int num3;
+       	int num4;
+       	int num6;
+       	int num4active = 0;
+       	int subopcode2 = BITS(state->words[0],22,23);
+    	subopcode = BITS(state->words[0],16,21);
+    	switch (subopcode) {
+    	    case 0x12:
+    	    case 0x27:
+    	    case 0x28:
+    		    num4active = 1;
+    		    break;
+    	}
+    	switch (subopcode2) {
+    	    case 0:
+    	        CHECK_FIELD_C();
+     	        CHECK_FIELD_B();
+    	      	CHECK_FIELD_A();
+    	        write_instr_name();
+    	        WRITE_FORMAT_x(A);
+    	        switch (subopcode) {
+    	        	case 0x12:
+    	        		strcat(formatString,",[cjid:%r],%r,%r");
+    	        		my_sprintf(state, state->operandBuffer, formatString, fieldA, fieldB, fieldB, fieldC);
+    	        		break;
+    	        	case 0x15:
+    	        		strcat(formatString,",[cm:%r],%r");
+    	        		my_sprintf(state, state->operandBuffer, formatString, fieldA, fieldB, fieldC);
+    	        		break;
+        	        case 0x10:
+        	        case 0x11:
+        	        case 0x26:
+        	        case 0x28:
+        	        case 0x2B:
+       	        	    strcat(formatString,",[cm:%r],%r,%r");
+       	        	    my_sprintf(state, state->operandBuffer, formatString, fieldA, fieldB, fieldB, fieldC);
+           	        	break;
+    	            default:
+    	    	        WRITE_FORMAT_COMMA_x(B);
+    	    	        WRITE_FORMAT_COMMA_x(C);
+    	    	        my_sprintf(state, state->operandBuffer, formatString, fieldA, fieldB, fieldC);
+    	    	        break;
+     	        }
+    	        break;
+    	    case 1:
+     	        CHECK_FIELD_B();
+    	      	CHECK_FIELD_A();
+    	        c = BITS(state->words[0],11,11);
+    	        ib = BITS(state->words[0],10,10);
+      	        num2 = BITS(state->words[0],6,7);
+      	        num3 = BITS(state->words[0],6,8);
+      	        num4 = BITS(state->words[0],6,9);
+       	        num6 = BITS(state->words[0],6,11);
+    	        if ( num2 == 0 )  num2 = 4;
+    	        if ( num3 == 0 )  num3 = 8;
+    	        if ( num6 == 0 ) num6 = 64;
+    	        if ( ( subopcode == 0x26 ) && ( c == 0 ) ) instrName = "sidxalc";
+    	        if ( ( subopcode == 0x10 ) && ( num3 == 1 ) ) instrName = "sbdalc";
+    	        if ( ( subopcode == 0x2B ) && ( c == 0 ) ) instrName = "sjobalc";
+    	        write_instr_name();
+    	        WRITE_FORMAT_x(A);
+//    	        WRITE_FORMAT_COMMA_x(B);
+    	        switch (subopcode) {
+    	        case 0x12:
+        	        strcat(formatString,",[cjid:%r],%r,%d");
+        	        my_sprintf(state, state->operandBuffer, formatString, fieldA, fieldB, fieldB, num4);
+    	        	break;
+    	        case 0x15:
+//    	        	strcat(formatString,",%d");
+//    	        	my_sprintf(state, state->operandBuffer, formatString, fieldA, fieldB, num6);
+        	        strcat(formatString,",[cm:%r],%d");
+        	        my_sprintf(state, state->operandBuffer, formatString, fieldA, fieldB, num6);
+    	        	break;
+    	        case 0x26:
+   	        	if ( c == 0 ) {
+   	           	        WRITE_FORMAT_COMMA_x(B);
+        	        	my_sprintf(state, state->operandBuffer, formatString, fieldA, fieldB);
+    	        	}
+    	        	else {
+       	        	    strcat(formatString,",[cm:%r],%r,%d");
+       	        	    my_sprintf(state, state->operandBuffer, formatString, fieldA, fieldB, fieldB, num3);
+     	        	}
+    	        	break;
+    	        case 0x28:
+    	        case 0x11:
+   	        	    strcat(formatString,",[cm:%r],%r,%d");
+   	        	    my_sprintf(state, state->operandBuffer, formatString, fieldA, fieldB, fieldB, num3);
+       	        	break;
+    	        case 0x2B:
+    	        	if (c) {
+    	        		strcat(formatString,",[cm:%r],%r,%d");
+    	        		my_sprintf(state, state->operandBuffer, formatString, fieldA, fieldB, fieldB, num2);
+    	        	}
+    	        	else {
+    	        		strcat(formatString,",%r");
+    	        		my_sprintf(state, state->operandBuffer, formatString, fieldA, fieldB);
+    	        	}
+       	        	break;
+    	        case 0x10:
+    	        	if ( num3 == 1 ) {
+       	        	    strcat(formatString,",%r,%d");
+       	        	    my_sprintf(state, state->operandBuffer, formatString, fieldA, fieldB, ib);
+    	        	}
+    	        	else {
+       	        	    strcat(formatString,",[cm:%r],%r,%d,%d");
+       	        	    my_sprintf(state, state->operandBuffer, formatString, fieldA, fieldB, fieldB, ib, num3);
+    	        	}
+    	        	break;
+    	        default:
+        	        WRITE_FORMAT_COMMA_x(B);
+        	        if ( c == 0 ) {
+        	        	strcat(formatString,",%d");
+        	        	my_sprintf(state, state->operandBuffer, formatString, fieldA, fieldB, subopcode != 0x10 ? (num4active != 1 ? num3 : num4) : ib);
+        	        }
+        	        else {
+        	        	strcat(formatString,",%d,%d");
+        	        	my_sprintf(state, state->operandBuffer, formatString, fieldA, fieldB, ib, num4active != 1 ? num3 : num4);
+        	        }
+    	        	break;
+    	        }
+    	        break;
+    	    default:
+    	        write_instr_name();
+	        	strcat(formatString,"????");
+	        	my_sprintf(state, state->operandBuffer, formatString);
+	        	break;
+    	}
+    	break;
+    case 66:
+        {
+/*  the format 'cp  dst,[dst_addr_type:d1,d2],[src_addr_type:s1,s2],size' */
+        	int t;
+        	int m;
+//        	int ec;
+        	int s;
+        	int o;
+        	int bdOff;
+        	int size10;
+        	int ccm;
+        	int imm;
+        	int i2;
+        	int subOpc1;
+        	int subOpc2;
+        	int major;
+        	int size;
+        	int typeAll;
+        	char *dstStr;
+        	char *srcStr;
+        	int numDp;
+        	int numSp;
+        	char name[20];
+          	fieldA = 62; // dummy value only to update limm_value
+            CHECK_FIELD(fieldA);
+           	fieldA = BITS(state->words[0],21,26);
+           	fieldB = BITS(state->words[0],16,20);
+           	fieldC = BITS(state->words[0],11,15);
+            fieldAisReg = 1;
+            fieldBisReg = 1;
+            fieldCisReg = 1;
+           	if ( fieldA == 62 ) {
+           		fieldA = 0;
+           		fieldAisReg = 0;
+           	}
+            subOpc1 = BITS(state->words[0],0,4);
+        	major = BITS(state->words[0],27,31);
+        	ccm = limm_value & 0x0000ffff;
+        	size = (limm_value & 0x000ffc00) >> 10;
+        	subOpc2 = ((limm_value & 0xe0000000) >> 29) & 0x07;
+        	m = (limm_value & 0x10000000) >> 28;
+        	t = (limm_value & 0x08000000) >> 27;
+        	c = (limm_value & 0x04000000) >> 26;
+        	i2 = (limm_value & 0x03000000) >> 24;
+        	imm = (limm_value & 0x00ff0000) >> 16;
+        	s = (limm_value & 0x02000000) >> 25;
+        	o = (limm_value & 0x01000000) >> 24;
+        	bdOff = limm_value & 0x000003FF;
+        	typeAll = (limm_value & 0x0f000000) >> 24;
+        	size10 = (limm_value & 0x003FF000) >> 12;
+        	if ( size10 == 0 ) size10 = 0x400;
+        	if ( ( (typeAll & 0x03) == 0x01 ) && ( imm == 0 ) ) imm = 0x100;
+        	dstStr = "??:";
+        	srcStr = "??:";
+        	numDp = numSp = 1;
+        	strcpy(name,"cp");
+        	switch (subOpc1) {
+        		case 1:
+        			switch (subOpc2) {
+        				case 0:
+        					dstStr = "cbd:";	srcStr = "cbd:";
+        					numDp = 2;			numSp = 2;
+        					checkAdd_e(typeAll,name);
+        					break;
+        				case 1:
+        					dstStr = "cbd:";	srcStr = "cxa:";
+        					numDp = 2;			numSp = 1;
+        					break;
+        				case 2:
+        					dstStr = "cxa:";	srcStr = "cbd:";
+        					numDp = 1;			numSp = 2;
+        					break;
+        				case 3:
+        					dstStr = NULL;		srcStr = "cbd:";
+        					numDp = 0;			numSp = 2;
+        					break;
+        				case 4:
+        					dstStr = "cm:";		srcStr = "cbd:";
+        					numDp = 1;			numSp = 2;
+        					break;
+        				case 6:
+        					dstStr = "cbd:";	srcStr = "cm:";
+        					numDp = 2;			numSp = 1;
+        					break;
+        				case 5:
+        					dstStr = "cm:";		srcStr = "cjid:";
+        					numDp = 1;			numSp = 1;
+        					break;
+        				case 7:
+        					dstStr = "cjid:";	srcStr = "cm:";
+        					numDp = 1;			numSp = 1;
+        					break;
+        			}
+        			break;
+        		case 2:
+        			switch (subOpc2) {
+        				case 0:
+        					dstStr = "clbd:";	srcStr = "clbd:";
+        					numDp = 2;			numSp = 2;
+        					checkAdd_e(typeAll,name);
+        					break;
+        				case 1:
+        					dstStr = "clbd:";	srcStr = "cxa:";
+        					numDp = 2;			numSp = 1;
+        					break;
+        				case 2:
+        					dstStr = "cxa:";	srcStr = "clbd:";
+        					numDp = 1;			numSp = 2;
+        					break;
+        				case 3:
+        					break;
+        				case 4:
+        					dstStr = "cm:";		srcStr = "clbd:";
+        					numDp = 1;			numSp = 2;
+        					break;
+        				case 5:
+        					dstStr = "cm:";		srcStr = "csd:";
+        					numDp = 1;			numSp = 1;
+        					break;
+        				case 6:
+        					dstStr = "clbd:";	srcStr = "cm:";
+        					numDp = 2;			numSp = 1;
+        					break;
+        				case 7:
+        					break;
+        			}
+        			break;
+        		case 3:
+        			if ((limm_value & 0x08000000) >> 27) strcat(name,".na");
+        			if ((limm_value & 0x00800000) >> 23) strcat(name,".x");
+        			switch (subOpc2) {
+        				case 0:
+        					break;
+        				case 1:
+        					dstStr = NULL;		srcStr = "cxa:";
+        					numDp = 0;			numSp = 1;
+        					break;
+        				case 2:
+        					break;
+        				case 3:
+        					dstStr = "cxa:";	srcStr = "cxa:";
+        					numDp = 1;			numSp = 1;
+        					break;
+        				case 4:
+        					break;
+        				case 5:
+        					dstStr = "cm:";		srcStr = "cxa:";
+        					numDp = 1;			numSp = 1;
+        					break;
+        				case 6:
+        					dstStr = NULL;		srcStr = "cm:";
+        					numDp = 0;			numSp = 1;
+        					break;
+        				case 7:
+        					dstStr = "cxa:";	srcStr = "cm:";
+        					numDp = 1;			numSp = 1;
+        					break;
+        			}
+        			break;
+        		default:
+        			strcat(name,"??");
+        			break;
+        	}
+        	if ( m != 0 ) strcat(name,".m");
+        	instrName = name;
+        	write_instr_name();
+    	    WRITE_FORMAT_x(A);
+        	numDp = numDp * 10 + numSp;
+        	switch (typeAll) {
+        	    case  8:
+        	    case 12:
+        	    	switch(numDp) {
+        	    	    case 01:
+     	    	    		strcat(formatString,",[%s%r],%r");
+     	    	    		my_sprintf(state, state->operandBuffer, formatString, fieldA, srcStr, fieldB, fieldC);
+     	    	    		break;
+	    	    	    case 02:
+         	    	    	strcat(formatString,",[%s%r,%r],%r");
+         	    	    	my_sprintf(state, state->operandBuffer, formatString, fieldA, srcStr, fieldB, fieldC, fieldC);
+        	    	    	break;
+    	    	    	    case 11:
+    	    	    		strcat(formatString,",[%s%r],[%s%r],%r");
+    	    	    		my_sprintf(state, state->operandBuffer, formatString, fieldA, dstStr, fieldB, srcStr, fieldB, fieldC);
+    	    	    		break;
+        	    	    case 12:
+         	    	    	strcat(formatString,",[%s%r],[%s%r,%r],%r");
+         	    	    	my_sprintf(state, state->operandBuffer, formatString, fieldA, dstStr, fieldB, srcStr, fieldB, fieldC, fieldC);
+        	    	    	break;
+        	    	    case 21:
+         	    	    	strcat(formatString,",[%s%r,%r],[%s%r],%r");
+        	    	    	my_sprintf(state, state->operandBuffer, formatString, fieldA, dstStr, fieldB, fieldC, srcStr, fieldB, fieldC);
+        	    	    	break;
+        	    	    case 22:
+         	    	    	strcat(formatString,",[%s%r,%r],[%s%r,%r],%r");
+        	    	    	my_sprintf(state, state->operandBuffer, formatString, fieldA, dstStr, fieldB, fieldC, srcStr, fieldB, fieldC, fieldC);
+        	    	    	break;
+        	    	}
+        	    	break;
+        	    case  0:
+        	    case  3:
+        	    	switch(numDp) {
+			     case 01:
+				strcat(formatString,",[%s0x%04x],%r");
+				my_sprintf(state, state->operandBuffer, formatString, fieldA, srcStr, ccm, fieldC);
+				break;
+			     case 02:
+         	    	    	strcat(formatString,",[%s0x%04x,%r],%r");
+         	    	    	my_sprintf(state, state->operandBuffer, formatString, fieldA, srcStr, ccm, fieldC, fieldC);
+        	    	    	break;
+			     case 11:
+				if (c) {
+					strcat(formatString,",[%s%r],[%s0x%04x],%r");
+					my_sprintf(state, state->operandBuffer, formatString, fieldA, dstStr, fieldB, srcStr, ccm, fieldC);
+				}
+				else {
+					if ((subOpc2 == 5) || (subOpc2 == 7)){
+						strcat(formatString,",[%s%r],[%s0x%04x],%r");
+						my_sprintf(state, state->operandBuffer, formatString, fieldA, dstStr, fieldB, srcStr, ccm, fieldC);
+					}
+					else {
+						strcat(formatString,",[%s%r],[%s%r],%r");
+						my_sprintf(state, state->operandBuffer, formatString, fieldA, dstStr, fieldB, srcStr, fieldB, fieldC);
+					}
+				}
+				break;
+        	    	    case 12:
+         	    	    	strcat(formatString,",[%s%r],[%s0x%04x,%r],%r");
+         	    	    	my_sprintf(state, state->operandBuffer, formatString, fieldA, dstStr, fieldB, srcStr, ccm, fieldC, fieldC);
+        	    	    	break;
+        	    	    case 21:
+         	    	    	strcat(formatString,",[%s%r,%r],[%s0x%04x],%r");
+        	    	    	my_sprintf(state, state->operandBuffer, formatString, fieldA, dstStr, fieldB, fieldC, srcStr, ccm, fieldC);
+        	    	    	break;
+        	    	    case 22:
+         	    	    	strcat(formatString,",[%s%r,%r],[%s0x%04x,%r],%r");
+        	    	    	my_sprintf(state, state->operandBuffer, formatString, fieldA, dstStr, fieldB, fieldC, srcStr, ccm, fieldC, fieldC);
+        	    	    	break;
+        	    	}
+        	    	break;
+            	case  4:
+        	    case  7:
+        	    	switch(numDp) {
+        	    	    case 11:
+         	    	    	strcat(formatString,",[%s0x%04x],[%s%r],%r");
+				my_sprintf(state, state->operandBuffer, formatString, fieldA, dstStr, ccm, srcStr, fieldB, fieldC);
+				break;
+        	    	    case 12:
+         	    	    	strcat(formatString,",[%s0x%04x],[%s%r,%r],%r");
+         	    	    	my_sprintf(state, state->operandBuffer, formatString, fieldA, dstStr, ccm, srcStr, fieldB, fieldC, fieldC);
+        	    	    	break;
+        	    	    case 21:
+         	    	    	strcat(formatString,",[%s0x%04x,%r],[%s%r],%r");
+        	    	    	my_sprintf(state, state->operandBuffer, formatString, fieldA, dstStr, ccm, fieldC, srcStr, fieldB, fieldC);
+        	    	    	break;
+        	    	    case 22:
+         	    	    	strcat(formatString,",[%s0x%04x,%r],[%s%r,%r],%r");
+        	    	    	my_sprintf(state, state->operandBuffer, formatString, fieldA, dstStr, ccm, fieldC, srcStr, fieldB, fieldC, fieldC);
+        	    	    	break;
+        	    	}
+        	    	break;
+        	    case  1:
+        	    	switch(numDp) {
+    	    	    	    case 01:
+	    	    	    	if ( subOpc1 != 3) {
+    		    	    		strcat(formatString,",[%s0x%04x],%d");
+    	    		    		my_sprintf(state, state->operandBuffer, formatString, fieldA, srcStr, ccm, imm);
+    	    	    		}
+    	    	    		else {
+         	    	    		strcat(formatString,",[%s%r],0x%04x");
+        	    	    		my_sprintf(state, state->operandBuffer, formatString, fieldA, srcStr, fieldB, ccm);
+    	    	    		}
+    	    		    	break;
+    	    	    	    case 02:
+     	    	    		strcat(formatString,",[%s0x%04x,%r],%d");
+     	    	    		my_sprintf(state, state->operandBuffer, formatString, fieldA, srcStr, ccm, fieldC, imm);
+    	    	    		break;
+    	    	    	    case 11:
+    	    	    		if ( subOpc1 != 3) {
+    	    	    			strcat(formatString,",[%s%r],[%s0x%04x],%d");
+    	    	    			my_sprintf(state, state->operandBuffer, formatString, fieldA, dstStr, fieldB, srcStr, ccm, imm);
+    	    	    		}
+    	    	    		else {
+         	    	    		strcat(formatString,",[%s%r],[%s%r],0x%04x");
+        	    	    		my_sprintf(state, state->operandBuffer, formatString, fieldA, dstStr, fieldB, srcStr, fieldB, ccm);
+    	    	    		}
+    	    		    	break;
+    	    	    	    case 12:
+     	    	    		strcat(formatString,",[%s%r],[%s0x%04x,%r],%d");
+     	    	    		my_sprintf(state, state->operandBuffer, formatString, fieldA, dstStr, fieldB, srcStr, ccm, fieldC, imm);
+    	    	    		break;
+        	    	    case 21:
+         	      		strcat(formatString,",[%s%r,%r],[%s0x%04x],%d");
+        	       		my_sprintf(state, state->operandBuffer, formatString, fieldA, dstStr, fieldB, fieldC, srcStr, ccm, imm);
+        	       		break;
+        	    	    case 22:
+         	      		strcat(formatString,",[%s%r,%r],[%s0x%04x,%r],%d");
+        	        	my_sprintf(state, state->operandBuffer, formatString, fieldA, dstStr, fieldB, fieldC, srcStr, ccm, fieldC, imm);
+        	        	break;
+        	    	}
+        	    	break;
+            	case  5:
+        	    	switch(numDp) {
+        	    	    case 11:
+         	    	    	strcat(formatString,",[%s0x%04x],[%s%r],%d");
+        	    	    	my_sprintf(state, state->operandBuffer, formatString, fieldA, dstStr, ccm, srcStr, fieldB, imm);
+        	    		    break;
+        	    	    case 12:
+         	    	    	strcat(formatString,",[%s0x%04x],[%s%r,%r],%d");
+         	    	    	my_sprintf(state, state->operandBuffer, formatString, fieldA, dstStr, ccm, srcStr, fieldB, fieldC, imm);
+        	    	    	break;
+        	    	    case 21:
+         	    	    	strcat(formatString,",[%s0x%04x,%r],[%s%r],%d");
+        	    	    	my_sprintf(state, state->operandBuffer, formatString, fieldA, dstStr, ccm, fieldC, srcStr, fieldB, imm);
+        	    	    	break;
+        	    	    case 22:
+         	    	    	strcat(formatString,",[%s0x%04x,%r],[%s%r,%r],%d");
+        	    	    	my_sprintf(state, state->operandBuffer, formatString, fieldA, dstStr, ccm, fieldC, srcStr, fieldB, fieldC, imm);
+        	    	    	break;
+        	    	}
+        	    	break;
+        	    case  2:
+        	    	switch(numDp) {
+		            case 01:
+				strcat(formatString,",[%s0x%04x],%r");
+				my_sprintf(state, state->operandBuffer, formatString, fieldA, srcStr, ccm, fieldC);
+				break;
+			    case 02:
+				strcat(formatString,",[%s0x%04x,%d],%r");
+				my_sprintf(state, state->operandBuffer, formatString, fieldA, srcStr, ccm, imm, fieldC);
+				break;
+			    case 11:
+				strcat(formatString,",[%s%r],[%s0x%04x],%r");
+				my_sprintf(state, state->operandBuffer, formatString, fieldA, dstStr, fieldB, srcStr, ccm, fieldC);
+				break;
+			    case 12:
+				strcat(formatString,",[%s%r],[%s0x%04x,%d],%r");
+				my_sprintf(state, state->operandBuffer, formatString, fieldA, dstStr, fieldB, srcStr, ccm, imm, fieldC);
+				break;
+        	    	    case 21:
+         	    	    	strcat(formatString,",[%s%r,%d],[%s0x%04x],%r");
+        	    	    	my_sprintf(state, state->operandBuffer, formatString, fieldA, dstStr, fieldB, imm, srcStr, ccm, fieldC);
+        	    	    	break;
+        	    	    case 22:
+         	    	    	strcat(formatString,",[%s%r,%d],[%s0x%04x,%r],%r");
+        	    	    	my_sprintf(state, state->operandBuffer, formatString, fieldA, dstStr, fieldB, imm, srcStr, ccm, fieldC, fieldC);
+        	    	    	break;
+        	    	}
+        	    	break;
+        	    case  6:
+        	    	switch(numDp) {
+        	    	    case 11:
+         	    	    	strcat(formatString,",[%s0x%04x],[%s%r],%r");
+        	    	    	my_sprintf(state, state->operandBuffer, formatString, fieldA, dstStr, ccm, srcStr, fieldB, fieldC);
+        	    	    	break;
+        	    	    case 12:
+         	    	    	strcat(formatString,",[%s0x%04x],[%s%r,%d],%r");
+        	    	    	my_sprintf(state, state->operandBuffer, formatString, fieldA, dstStr, ccm, srcStr, fieldB, imm, fieldC);
+        	    	    	break;
+        	    	    case 21:
+         	    	    	strcat(formatString,",[%s0x%04x,%d],[%s%r],%r");
+        	    	    	my_sprintf(state, state->operandBuffer, formatString, fieldA, dstStr, ccm, imm, srcStr, fieldB, fieldC);
+        	    	    	break;
+        	    	    case 22:
+         	    	    	strcat(formatString,",[%s0x%04x,%d],[%s%r,%r],%r");
+        	    	    	my_sprintf(state, state->operandBuffer, formatString, fieldA, dstStr, ccm, imm, srcStr, fieldB, fieldC, fieldC);
+        	    	    	break;
+        	    	}
+        	    	break;
+        	    case  9:
+        	    	switch(numDp) {
+        	    	    case 11:
+         	    	    	strcat(formatString,",[%s%r],[%s%r],0x%04x");
+        	    	    	my_sprintf(state, state->operandBuffer, formatString, fieldA, dstStr, fieldB, srcStr, fieldB, ccm);
+        	    	    	break;
+        	    	    case 12:
+         	    	    	strcat(formatString,",[%s%r],[%s%r,%d],%r");
+        	    	    	my_sprintf(state, state->operandBuffer, formatString, fieldA, dstStr, fieldB, srcStr, fieldB, bdOff, fieldC);
+        	    	    	break;
+        	    	    case 21:
+         	    	    	strcat(formatString,",[%s%r,%d],[%s%r],%r");
+        	    	    	my_sprintf(state, state->operandBuffer, formatString, fieldA, dstStr, fieldB, bdOff, srcStr, fieldB, fieldC);
+        	    	    	break;
+        	    	    case 22:
+         	    	    	strcat(formatString,",[%s%r,%d],[%s%r,%r],%r");
+        	    	    	my_sprintf(state, state->operandBuffer, formatString, fieldA, dstStr, fieldB, bdOff, srcStr, fieldB, fieldC, fieldC);
+        	    	    	break;
+        	    	}
+        	    	break;
+        	    case 11:
+        	    	switch(numDp) {
+        	    	    case 11:
+         	    	    	strcat(formatString,",[%s],[%s],??%d-%d");
+        	    	    	my_sprintf(state, state->operandBuffer, formatString, fieldA, dstStr, srcStr, typeAll, numDp);
+        	    	    	break;
+        	    	    case 12:
+         	    	    	strcat(formatString,",[%s%r],[%s%r,%d],%d");
+        	    	    	my_sprintf(state, state->operandBuffer, formatString, fieldA, dstStr, fieldB, srcStr, fieldB, bdOff, size10);
+        	    	    	break;
+        	    	    case 21:
+         	    	    	strcat(formatString,",[%s%r,%d],[%s%r],%d");
+        	    	    	my_sprintf(state, state->operandBuffer, formatString, fieldA, dstStr, fieldB, bdOff, srcStr, fieldB, size10);
+        	    	    	break;
+        	    	    case 22:
+         	    	    	strcat(formatString,",[%s%r,%d],[%s%r,%r],%d");
+        	    	    	my_sprintf(state, state->operandBuffer, formatString, fieldA, dstStr, fieldB, bdOff, srcStr, fieldB, fieldC, size10);
+        	    	    	break;
+        	    	}
+        	    	break;
+            	case 13:
+            	    switch(numDp) {
+            	    	case 11:
+            	    	case 12:
+            	    	case 21:
+             	    	   	strcat(formatString,",[%s],[%s],??%d-%d");
+            	    	   	my_sprintf(state, state->operandBuffer, formatString, fieldA, dstStr, srcStr, typeAll, numDp);
+            	    	   	break;
+            	    	case 22:
+             	    	   	strcat(formatString,",[%s%r,%d],[%s%r,%d],%r");
+            	    	   	my_sprintf(state, state->operandBuffer, formatString, fieldA, dstStr, fieldB, bdOff, srcStr, fieldB, bdOff, fieldC);
+            	    	   	break;
+            	    }
+            	    break;
+            	case 15:
+            	    switch(numDp) {
+            	        case 11:
+            	        case 12:
+            	        case 21:
+             	        	strcat(formatString,",[%s],[%s],??%d-%d");
+            	        	my_sprintf(state, state->operandBuffer, formatString, fieldA, dstStr, srcStr, typeAll, numDp);
+            	        	break;
+           	    	    case 22:
+           	    	    	strcat(formatString,",[%s%r,%d],[%s%r,%d],%d");
+           	    	    	my_sprintf(state, state->operandBuffer, formatString, fieldA, dstStr, fieldB, bdOff, srcStr, fieldB, bdOff, size10);
+           	    	    	break;
+           	    	}
+           	    	break;
+        	    case 10:
+        	    case 14:
+        	    	switch(numDp) {
+		            case 01:
+				strcat(formatString,",[%s%r],%d");
+				my_sprintf(state, state->operandBuffer, formatString, fieldA, srcStr, fieldB, size10);
+				break;
+        	    	    case 02:
+         	    	    	strcat(formatString,",[%s%r,%r],%d");
+         	    	    	my_sprintf(state, state->operandBuffer, formatString, fieldA, srcStr, fieldB, fieldC, size10);
+        	    	    	break;
+			    case 11:
+				if (!c) {
+					if (subOpc1 == 3) {
+						strcat(formatString,",[%s%r],[%s0x%04x],%r");
+						my_sprintf(state, state->operandBuffer, formatString, fieldA, dstStr, fieldB, srcStr, ccm, fieldC);
+					}
+					else {
+						strcat(formatString,",[%s%r],[%s%r],%d");
+						my_sprintf(state, state->operandBuffer, formatString, fieldA, dstStr, fieldB, srcStr, fieldB, size10);
+					}
+				}
+				else {
+					strcat(formatString,",[%s0x%04x],[%s%r],%r");
+					my_sprintf(state, state->operandBuffer, formatString, fieldA, dstStr, ccm, srcStr, fieldB, fieldC);
+				}
+				break;
+        	    	    case 12:
+         	    	    	strcat(formatString,",[%s%r],[%s%r,%r],%d");
+         	    	    	my_sprintf(state, state->operandBuffer, formatString, fieldA, dstStr, fieldB, srcStr, fieldB, fieldC, size10);
+        	    	    	break;
+        	    	    case 21:
+         	    	    	strcat(formatString,",[%s%r,%r],[%s%r],%d");
+        	    	    	my_sprintf(state, state->operandBuffer, formatString, fieldA, dstStr, fieldB, fieldC, srcStr, fieldB, size10);
+        	    	    	break;
+        	    	    case 22:
+         	    	    	strcat(formatString,",[%s%r,%r],[%s%r,%r],%d");
+        	    	    	my_sprintf(state, state->operandBuffer, formatString, fieldA, dstStr, fieldB, fieldC, srcStr, fieldB, fieldC, size10);
+        	    	    	break;
+        	    	}
+        	    	break;
+        	}
+       }
+       break;
+    case 67:
+        {
+         	int size1_64;
+        	int ccm;
+        	int i2;
+        	int subOpc2;
+//        	int s1EQs2 = 0;
+        	int sizeAndC = 0;
+        	fieldA = 62; // dummy value only to update limm_value
+            CHECK_FIELD(fieldA);
+        	fieldA = BITS(state->words[0],21,26);
+        	fieldB = BITS(state->words[0],16,20);
+        	fieldC = BITS(state->words[0],11,15);
+           	fieldAisReg = 1;
+           	fieldBisReg = 1;
+           	fieldCisReg = 1;
+           	if ( fieldA == 62 ) {
+           		fieldA = 0;
+           		fieldAisReg = 0;
+           	}
+        	subOpc2 = ((limm_value & 0xf8000000) >> 27) & 0x1F;
+        	i2 = (limm_value & 0x07000000) >> 24;
+        	ccm = limm_value & 0x0000ffff;
+        	size1_64 = (limm_value & 0x003f0000) >> 16;
+        	if (size1_64 == 0) size1_64 = 64;
+        	switch (subOpc2) {
+    	    case 0x00:
+    	    	instrName = "dcipv4";
+    	    	sizeAndC = 1;
+    	    	break;
+    	    case 0x10:
+    	    	instrName = "dcipv4l";
+    	    	sizeAndC = 1;
+    	    	break;
+    	    case 0x01:
+    	    	instrName = "dcipv6";
+    	    	sizeAndC = 1;
+    	    	break;
+    	    case 0x11:
+    	    	instrName = "dcipv6l";
+    	    	sizeAndC = 1;
+    	    	break;
+    	    case 0x04:
+    	    	instrName = "dcmac";
+    	    	break;
+    	    case 0x14:
+    	    	instrName = "dcmacl";
+    	    	break;
+    	    case 0x05:
+    	    	instrName = "dcmpls";
+    	    	break;
+    	    case 0x08:
+    	    	instrName = "dcsmpls";
+    	    	break;
+    	    case 0x15:
+    	    	instrName = "dcmplsl";
+    	    	break;
+    	    case 0x18:
+    	    	instrName = "dcsmplsl";
+    	    	break;
+    	    case 0x13:
+    	    	instrName = "dcudpl";
+    	    	break;
+    	    case 0x12:
+    	    	instrName = "dctcpl";
+    	    	break;
+    	    case 0x17:
+    	    	instrName = "dcgrel";
+    	    	break;
+    	    case 0x16:
+    	    	instrName = "dcmiml";
+    	    	break;
+    	    default:
+    	    	instrName = "dc????";
+    	    	break;
+        	}
+    	    write_instr_name();
+    	    WRITE_FORMAT_x(A);
+    	    switch ( i2 ) {
+    	    	case 0:
+    	    		if ( sizeAndC == 0 ) {
+    	    			strcat(formatString,",[cm:%r],[cm:%r],%d");
+    	    			my_sprintf(state, state->operandBuffer, formatString, fieldA, fieldB, fieldB, size1_64);
+    	    		}
+    	    		else {
+    	    			strcat(formatString,",[cm:%r],[cm:%r],%r,%d");
+    	    			my_sprintf(state, state->operandBuffer, formatString, fieldA, fieldB, fieldB, fieldC, size1_64);
+    	    		}
+    	    		break;
+    	    	case 2:
+    	    		if ( sizeAndC == 0 ) {
+    	    			strcat(formatString,",[cm:%r],[cm:0x%04x],%d");
+    	    			my_sprintf(state, state->operandBuffer, formatString, fieldA, fieldB, ccm, size1_64);
+    	    		}
+    	    		else {
+    	    			strcat(formatString,",[cm:%r],[cm:0x%04x],%r,%d");
+    	    			my_sprintf(state, state->operandBuffer, formatString, fieldA, fieldB, ccm, fieldC, size1_64);
+    	    		}
+    	    		break;
+    	    	case 3:
+    	    		if ( sizeAndC == 0 ) {
+    	    			strcat(formatString,",[cm:0x%04x],[cm:%r],%d");
+    	    			my_sprintf(state, state->operandBuffer, formatString, fieldA, ccm, fieldB, size1_64);
+    	    		}
+    	    		else {
+    	    			strcat(formatString,",[cm:0x%04x],[cm:%r],%r,%d");
+    	    			my_sprintf(state, state->operandBuffer, formatString, fieldA, ccm, fieldB, fieldC, size1_64);
+    	    		}
+    	    		break;
+    	    	case 4:
+    	    		strcat(formatString,",[cm:%r],[cm:%r],%r");
+    	    		my_sprintf(state, state->operandBuffer, formatString, fieldA, fieldB, fieldB, fieldC);
+    	    		break;
+    	    	case 6:
+    	    		strcat(formatString,",[cm:%r],[cm:0x%04x],%r");
+    	    		my_sprintf(state, state->operandBuffer, formatString, fieldA, fieldB, ccm, fieldC);
+    	    		break;
+    	    	case 7:
+    	    		strcat(formatString,",[cm:0x%04x],[cm:%r],%r");
+    	    		my_sprintf(state, state->operandBuffer, formatString, fieldA, ccm, fieldB, fieldC);
+    	    		break;
+    	    	default:
+    	    		strcat(formatString,",????");
+    	    		my_sprintf(state, state->operandBuffer, formatString, fieldA);
+    	    		break;
+    	    }
+    	    break;
+        }
+    case 68:
+      {
+          int s;
+          int size;
+          int offset;
+          int skip;
+          char name[20];
+          FIELD_C_AC16();
+          FIELD_B_AC16();
+          s = (state->words[0] & 0x0000C000) >> 14;
+          offset = (state->words[0] & 0x00001F00) >> (8-2);
+          size = (state->words[0] & 0x0000007F);
+          if ( size == 0 ) size = 128;
+          strcpy(name,"mcmp");
+          if ( (state->words[0] & 0x00002000) != 0 ) strcat(name,".s");
+          if ( (state->words[0] & 0x00000080) != 0 ) strcat(name,".m");
+          instrName = name;
+          write_instr_name();
+          switch(s) {
+          case 0:
+   			  strcat(formatString,"%r,[cm:%r,%r],[cm:%r],%r");
+              my_sprintf(state, state->operandBuffer, formatString,fieldB,fieldB,fieldB,fieldC,fieldC);
+        	  break;
+          case 1:
+        	  if ( offset == 0 ) {
+      			  strcat(formatString,"%r,[cm:%r],[cm:%r],%r");
+                  my_sprintf(state, state->operandBuffer, formatString,fieldB,fieldB,fieldC,fieldC);
+        	  }
+        	  else {
+      			  strcat(formatString,"%r,[cm:%r,%d],[cm:%r],%r");
+                  my_sprintf(state, state->operandBuffer, formatString,fieldB,fieldB,offset,fieldC,fieldC);
+        	  }
+        	  break;
+          case 2:
+   			  strcat(formatString,"%r,[cm:%r,%r],[cm:%r],%d");
+              my_sprintf(state, state->operandBuffer, formatString,fieldB,fieldB,fieldB,fieldC,size);
+        	  break;
+          case 3:
+        	  if ( offset == 0 ) {
+      			  strcat(formatString,"%r,[cm:%r],[cm:%r],%d");
+                  my_sprintf(state, state->operandBuffer, formatString,fieldB,fieldB,fieldC,size);
+        	  }
+        	  else {
+      			  strcat(formatString,"%r,[cm:%r,%d],[cm:%r],%d");
+                  my_sprintf(state, state->operandBuffer, formatString,fieldB,fieldB,offset,fieldC,size);
+        	  }
+        	  break;
+          default:
+  			  strcat(formatString,"%r,%r,????");
+              my_sprintf(state, state->operandBuffer, formatString,fieldB,fieldC);
+              break;
+          }
+          break;
+      }
+    case 69:
+      {
+    	  int subCmnd;
+	      CHECK_FIELD_B();
+	      CHECK_FIELD_A();
+	      subopcode = BITS(state->words[0],16,21);
+	      if (subopcode == 0x30)
+	    	  instrName = "wkup";
+	      else
+	      {
+	    	  subCmnd = BITS(state->words[0],6,11);
+	    	  switch (subCmnd) {
+	    	  	  case 0:
+	    	  		  break;
+   	  	          case 1:
+   	  	        	  instrName = "asri.core";
+   	  	        	  break;
+   	  	          case 2:
+   	  	        	  instrName = "asri.clsr";
+   	  	        	  break;
+   	  	          case 3:
+   	  	        	  instrName = "asri.all";
+   	  	        	  break;
+   	  	          case 4:
+   	  	        	  instrName = "asri.gic";
+   	  	        	  break;
+   	  	          case 5:
+   	  	        	  instrName = "rspi.gic";
+   	  	        	  break;
+   	  	          default:
+   	  	        	  instrName = "asri.????";
+   	  	      }
+	      }
+  	      write_instr_name();
+  	      WRITE_FORMAT_x(A);
+  	      WRITE_FORMAT_COMMA_x(B);
+          my_sprintf(state, state->operandBuffer, formatString,fieldA,fieldB);
+	      break;
+      }
+    case 70:
+    {
+    	int FieldStartPos, FieldSz, ShiftFactor, BitsToScramble, Scramble_en, v;
+    	v = state->words[0] & 0x0000FFFF;
+    	FieldStartPos = (v & 0x00000038) >> 3;
+    	FieldSz = (v & 0x000001C0) >> 6;
+    	ShiftFactor = (v & 0x00000E00) >> 9;
+    	BitsToScramble = (v & 0x00007000) >> 12;
+    	Scramble_en = (v & 0x00008000) >> 15;
+    	if (FieldSz == 0) FieldSz = 8;
+    	if (ShiftFactor == 0) ShiftFactor = 8;
+    	if (BitsToScramble == 0) BitsToScramble = 8;
+        FIELD_C_AC16();
+        FIELD_B_AC16();
+        if (v & 0x00000001)
+        	instrName = "imxb";
+    	write_instr_name();
+    	if ( Scramble_en ) {
+    		strcat(state->instrBuffer,".s");
+    		strcat(formatString,"%r,%r,%d,%d,%d,%d");
+    		my_sprintf(state, state->operandBuffer, formatString, fieldB, fieldC, FieldStartPos, FieldSz, ShiftFactor, BitsToScramble);
+    	}
+    	else {
+    		strcat(formatString,"%r,%r,%d,%d,%d");
+    		my_sprintf(state, state->operandBuffer, formatString, fieldB, fieldC, FieldStartPos, FieldSz, ShiftFactor);
+    	}
+    	break;
+    }
+    case 71:
+      {
+    	  int p = BITS(state->words[0],22,23);
+    	  directMem = BIT(state->words[0],15);
+    	  fieldC = FIELDC(state->words[0]);
+    	  if ( ( p != 1 ) && ( fieldC == 62 ) ) {
+             CHECK_FIELD(fieldC);
+             fieldC = 62;
+    	  }
+          CHECK_FIELD_B();
+          CHECK_FIELD_A();
+          write_instr_name();
+          switch(p) {
+              case 0:
+            	  if ( fieldC != 62 ) {
+            	      strcat(formatString,"%r,[%r]");
+            	      my_sprintf(state, state->operandBuffer, formatString, fieldB,fieldC);
+            	  }
+            	  else {
+            	      strcat(formatString,"%r,[0x%08x]");
+            	      my_sprintf(state, state->operandBuffer, formatString, fieldB,limm_value);
+     		      }
+            	  break;
+              case 1:
+        	      strcat(formatString,"%r,[%d]");
+        	      my_sprintf(state, state->operandBuffer, formatString, fieldB,fieldC);
+        	      break;
+          }
+          break;
+      }
+    case 72:
+      {
+    	  int size;
+      	  subopcode = BITS(state->words[0],0,2);
+      	  switch ( subopcode ) {
+     	      case 0:  instrName = "atst"; break;
+ 	          case 1:  instrName = "ari"; break;
+ 	          case 2:  instrName = "ardc"; break;
+ 	          case 4:  instrName = "aric"; break;
+ 	          case 5:  instrName = "aric.rvd"; break;
+ 	          case 6:  instrName = "arcl"; break;
+ 	      }
+          size = (state->words[0] & 0x00000018) >> 3;
+          size = 1 << size;
+          CHECK_FIELD_B();
+          CHECK_FIELD_C();
+          if ( BIT(state->words[0],15) != 0 ) flag = 1;
+          write_instr_name();
+          if ( BIT(state->words[0],5) != 0 ) {
+        	  strcat(state->instrBuffer,".di");
+          }
+	      strcat(formatString,"%r,[%r],%d");
+	      my_sprintf(state, state->operandBuffer, formatString, fieldB,fieldC,size);
+          break;
+      }
+    case 73:
+      {
+    	  int reg = 0;
+    	  if ( BITS(state->words[0],0,5) == 0x3f ) {
+    		  FIELD_B();
+    		  if (fieldBisReg) {
+    			  CHECK_FIELD_B();
+    			  reg = fieldB;
+    		  }
+    	  }
+    	  else {
+    		  CHECK_FIELD_C();
+    		  reg = fieldC;
+    	  }
+          write_instr_name();
+	      WRITE_FORMAT_x(B);
+	      my_sprintf(state, state->operandBuffer, formatString, reg);
+	      break;
+      }
+    case 74:
+      {
+          int m3;
+          int m1;
+          int s2;
+          int m2;
+          int size;
+          FIELD_C_AC16();
+          FIELD_B_AC16();
+          if ( (state->words[0] & 0x00100000) != 0 ) flag = 1;
+    	  m3 = BITS(state->words[0],5,8);
+          s2 = BITS(state->words[0],12,13);
+      	  m1 = BITS(state->words[0],14,14);
+          m2 = BITS(state->words[0],15,15);
+          size  =  BITS(state->words[0],9,11);
+          if ( (state->words[0] & 0x00100000) != 0 ) flag = 1;
+          write_instr_name();
+          s2 <<= 3;
+          size++;
+          if ( m3 != 15) {
+        	  strcat(formatString,"%r,%r,%r,%d,%d,%d,%d,%d");
+  	          my_sprintf(state, state->operandBuffer, formatString,fieldB,fieldB,fieldC,s2,size,m1,m2,m3);
+          }
+          else {
+        	  if ( m2 != 0 ) {
+            	  strcat(formatString,"%r,%r,%r,%d,%d,%d,%d");
+      	          my_sprintf(state, state->operandBuffer, formatString,fieldB,fieldB,fieldC,s2,size,m1,m2);
+        	  }
+        	  else {
+        		  if ( m1 != 0 ) {
+            	      strcat(formatString,"%r,%r,%r,%d,%d,%d");
+      	              my_sprintf(state, state->operandBuffer, formatString,fieldB,fieldB,fieldC,s2,size,m1);
+        		  }
+        		  else {
+            	      strcat(formatString,"%r,%r,%r,%d,%d");
+      	              my_sprintf(state, state->operandBuffer, formatString,fieldB,fieldB,fieldC,s2,size);
+        		  }
+        	  }
+          }
+          break;
+      }
+    case 75:
+      {
+    	  int type;
+    	  int size;
+    	  int target_size;
+    	  int subOpcode;
+    	  char lCommand[30];
+    	  int di;
+    	  int ps;
+    	  int c;
+    	  char strType[10];
+    	  if ( (state->words[0] & 0x00100000) != 0 ) flag = 1;
+    	  target_size = (state->words[0] & 0x00001c00) >> 10;
+    	  size = (state->words[0] & 0x00000300) >> 8;
+    	  type = (state->words[0] & 0x000000E0) >> 5;
+    	  subOpcode = (state->words[0] & 0x0000001F);
+    	  c = (state->words[0] & 0x00002000) >> 13;
+    	  di = (state->words[0] & 0x00004000) >> 14;
+    	  ps = (state->words[0] & 0x00008000) >> 15;
+    	  strcpy(lCommand,instrName);
+    	  switch (target_size) {
+    	      case 1:
+    	    	  if ( subOpcode != 20 ) {
+    	    	      strcat(lCommand,"b"); break;
+    	    	  }
+    	    	  strcpy(lCommand,"aricb.r");
+    	    	  break;
+    	      case 2:
+    	    	  if ( subOpcode != 20 ) {
+    	    	      strcat(lCommand,"w"); break;
+    	    	  }
+    	    	  strcpy(lCommand,"aricw.r");
+    	    	  break;
+    	      case 3:
+    	    	  break;
+    	      case 4:
+    	    	  if ((subOpcode != 3) && (subOpcode != 20)) {
+    	    		  strcat(lCommand,"l"); break;
+    	    	  }
+    	    	  break;
+    	      case 5:
+    	    	  if (subOpcode == 3) {
+      	    		  strcat(lCommand,"l"); break;
+      	    	  }
+    	    	  break;
+    	      default:
+    	      {
+    	    	  char tmp[10];
+    	    	  sprintf(tmp,"%d?",size);
+    	    	  strcat(lCommand,tmp);
+    	    	  break;
+    	      }
+    	  }
+    	  switch (type) {
+    	      case 0: strType[0] = 0;
+    	      	  switch (subOpcode) {
+    	      	  case 19: strcpy(lCommand,"aricl"); break;
+    	      	  default: break;
+    	      	  }
+    	      break;			// NULL string
+	          case 1: strcpy(strType,"xa:"); break;
+	          case 2: strcpy(strType,"scd:");
+	          	  switch(subOpcode) {
+	          	  case 1: strcpy(lCommand,"crst"); break;
+	          	  case 16: strcpy(lCommand,"cst"); break;
+	          	  default: break;
+	          	  }
+                          break;
+	          case 5:
+	        	  strcpy(strType,"cd:");
+	        	  switch (subOpcode) {
+    	  	  	  case 0: strcpy(lCommand,"pcincr"); break;
+    	  	  	  case 1: strcpy(lCommand,"pcdecr"); break;
+    	  	  	  case 2: strcpy(lCommand,"pcdincr"); break;
+    	  	  	  case 3: strcpy(lCommand,"pcinit"); break;
+    	  	  	  case 5: strcpy(lCommand,"pcdrcycl.cl"); break;
+    	  	  	  case 4: strcpy(lCommand,"pcdcl"); break;
+    	  	  	  case 6: strcpy(lCommand,"pcdrprt.cl"); break;
+    	  	  	  case 7: strcpy(lCommand,"pccl"); break;
+    	  	  	  case 8: strcpy(lCommand,"pcrcycl.cl"); break;
+    	  	  	  case 9: strcpy(lCommand,"pcrprt.cl"); break;
+    	  	  	  case 10: strcpy(lCommand,"pcrprt"); break;
+    	  	  	  case 11: strcpy(lCommand,"pcdrprt"); break;
+    	  	  	  case 12: strcpy(lCommand,"pcrcycl"); break;
+    	  	  	  case 13: strcpy(lCommand,"pcdrcycl"); break;
+    	  	  	  case 14: strcpy(lCommand,"pcincr.of"); break;
+    	  	  	  default: break;
+	        	  }
+	        	  break;
+	          case 6:
+	        	  strcpy(strType,"cd:");
+	        	  switch (subOpcode) {
+	        	  	  case 0: strcpy(lCommand,"cinit"); break;
+        	  	  	  case 1: strcpy(lCommand,"crst"); break;
+        	  	  	  case 2: strcpy(lCommand,"cincr"); break;
+        	  	  	  case 3: strcpy(lCommand,"cdecr"); break;
+        	  	  	  case 4: strcpy(lCommand,"cgetc"); break;
+        	  	  	  case 5: strcpy(lCommand,"cchkc"); break;
+        	  	  	  case 6: strcpy(lCommand,"cincr1"); break;
+        	  	  	  case 7: strcpy(lCommand,"cdecr1"); break;
+        	  	  	  case 8: strcpy(lCommand,"cdincr"); break;
+        	  	  	  case 9: strcpy(lCommand,"cbclr"); break;
+        	  	  	  case 10: strcpy(lCommand,"cbset"); break;
+        	  	  	  case 11: strcpy(lCommand,"cbcswp"); break;
+        	  	  	  case 12: strcpy(lCommand,"cbwr"); break;
+        	  	  	  case 13: strcpy(lCommand,"cbrd"); break;
+        	  	  	  case 14: strcpy(lCommand,"crd"); break;
+        	  	  	  case 15: strcpy(lCommand,"cld"); break;
+        	  	  	  case 16: strcpy(lCommand,"cst"); break;
+        	  	  	  case 17: strcpy(lCommand,"cdecrc"); break;
+        	  	  	  case 22: strcpy(lCommand,"cftch"); break;
+        	  	  	  case 23: strcpy(lCommand,"cmld"); break;
+        	  	  	  case 24: strcpy(lCommand,"cmst"); break;
+        	  	  	  case 25: strcpy(lCommand,"cminit"); break;
+        	  	  	  case 26: strcpy(lCommand,"cminit.rst"); break;
+        	  	  	  case 27: strcpy(lCommand,"cwrdb"); break;
+        	  	  	  case 28: strcpy(lCommand,"cwrde"); break;
+        	  	  	  default: break;
+	        	  }
+	        	  break;
+	          case 7: strcpy(strType,"mbd:"); break;
+    	      default: sprintf(strType,"?%d?:",type);  break;
+    	  }
+    	  if (di != 0) strcat(lCommand,".di");
+    	  instrName = lCommand;
+          write_instr_name();
+          FIELD_C_AC16();
+          FIELD_B_AC16();
+          switch ( subOpcode ) {
+          	  case 0:
+          	  case 2:
+          	  case 3:
+          	  case 6:
+          	  case 7:
+          	  case 16:
+          	  case 24:
+          	  case 25:
+          	  case 26:
+                  if ( ps == 0 ) {
+                	  if (c == 0) {
+                		  switch ( subOpcode ) {
+                		  case 3:
+                    		  strcat(formatString,"%r,%r,[%s%r],%r");
+                    		  my_sprintf(state, state->operandBuffer, formatString, fieldB, fieldB, strType, fieldC, fieldB);
+                			  break;
+                		  default:
+                			  if ((subOpcode == 2) && (c == 0) && (type == 6)) {
+                				  strcat(formatString,"%r,%r,[%s%r],%r");
+                				  my_sprintf(state, state->operandBuffer, formatString, fieldB, fieldB, strType, fieldC, fieldB);
+                			  }
+                			  else {
+                				  strcat(formatString,"%r,%r,[%s%r]");
+                				  my_sprintf(state, state->operandBuffer, formatString, fieldB, fieldB, strType, fieldC);
+                			  }
+                			  break;
+                		  }
+                	  }
+                	  else {
+                		  if ((type == 0) || (type == 7) || (type == 2) || (type == 6))
+                    			  	  strcat(formatString,"%r,[cm:GPA2],%r,[%s%r]");
+                		  else
+                    			  	  strcat(formatString,"%r,[cm:GPA1],%r,[%s%r]");
+                		  my_sprintf(state, state->operandBuffer, formatString, fieldB, fieldB, strType, fieldC);
+                	  }
+                  }
+                  else {
+                	  if (c == 0) {
+                    	  switch (type) {
+                    	  case 5:
+                    		  if ( subOpcode == 0 || subOpcode == 2 || subOpcode == 3 ) {
+                        		  strcat(formatString,"%r,[%s%r]");
+                        		  my_sprintf(state, state->operandBuffer, formatString, fieldB, strType, fieldC);
+                    		  }
+                    		  else {
+                          		  strcat(formatString,"[%s%r]");
+                              	  my_sprintf(state, state->operandBuffer, formatString, strType, fieldC);
+                    		  }
+                    		  break;
+                    	  default:
+                    		  strcat(formatString,"%r,[%s%r]");
+                    		  my_sprintf(state, state->operandBuffer, formatString, fieldB, strType, fieldC);
+                    		  break;
+                    	  }
+                	  }
+                	  else {
+                		  if ((subOpcode == 16) && ((type == 0) || (type == 1))) {
+                			  if (type == 0)
+                				  strcat(formatString,"[cm:GPA2],[%s%r]");
+                			  else
+                				  strcat(formatString,"[cm:GPA1],[%s%r]");
+                			  my_sprintf(state, state->operandBuffer, formatString, strType, fieldC);
+                		  }
+                		  else {
+                			  if ((type == 0) || (type == 7) || (type == 2) || (type == 6))
+                				  strcat(formatString,"[cm:GPA2],%r,[%s%r]");
+                			  else
+                				  strcat(formatString,"[cm:GPA1],%r,[%s%r]");
+                			  my_sprintf(state, state->operandBuffer, formatString, fieldB, strType, fieldC);
+                		  }
+                	  }
+                  }
+          		  break;
+          	  case 1:
+                  if ( ps == 0 ) {
+                	  if (c == 0) {
+                		  strcat(formatString,"%r,%r,[%s%r]");
+                		  my_sprintf(state, state->operandBuffer, formatString, fieldB, fieldB, strType, fieldC);
+                	  }
+                	  else {
+                	  strcat(formatString,"%r,[cm:GPA2],[%s%r]");
+                	  my_sprintf(state, state->operandBuffer, formatString, fieldB, strType, fieldC);
+                	  }
+            	  }
+            	  else {
+                	  if (c == 0) {
+                    	  switch (type) {
+                    	  case 5:
+                      		  strcat(formatString,"%r,[%s%r]");
+                          	  my_sprintf(state, state->operandBuffer, formatString, fieldB, strType, fieldC);
+                    		  break;
+                    	  default:
+                        	  strcat(formatString,"[%s%r]");
+                        	  my_sprintf(state, state->operandBuffer, formatString, strType, fieldC);
+                    		  break;
+                    	  }
+                	  }
+                	  else {
+                    	  strcat(formatString,"[cm:GPA2],[%s%r]");
+                    	  my_sprintf(state, state->operandBuffer, formatString, strType, fieldC);
+                	  }
+                  }
+          		  break;
+          	  case 11:
+          	  case 13:
+                  if ( ps == 0 ) {
+                	  if (c == 0) {
+                    	  strcat(formatString,"%r,%r,[%s%r]");
+                    	  my_sprintf(state, state->operandBuffer, formatString, fieldB, fieldB, strType, fieldC);
+                	  }
+                	  else {
+                		  strcat(formatString,"%r,[cm:GPA2],%r,[%s%r]");
+                		  my_sprintf(state, state->operandBuffer, formatString, fieldB, fieldB, strType, fieldC);
+                	  }
+            	  }
+            	  else {
+                	  switch (type) {
+                	  case 5:
+                  		  strcat(formatString,"[%s%r]");
+                      	  my_sprintf(state, state->operandBuffer, formatString, strType, fieldC);
+                		  break;
+                	  default:
+                		  strcat(formatString,"[cm:GPA2],%r,[%s%r]");
+                		  my_sprintf(state, state->operandBuffer, formatString, fieldB, strType, fieldC);
+                		  break;
+                	  }
+                  }
+          		  break;
+          	  case 4:
+          	  case 5:
+          	  case 9:
+          	  case 10:
+          	  case 12:
+                  if ( ps == 0 ) {
+                	  if ((c == 1) && (type == 6)) {
+                    	  strcat(formatString,"%r,[cm:GPA2],%r,[%s%r]");
+                		  my_sprintf(state, state->operandBuffer, formatString, fieldB, fieldB, strType, fieldC);
+                	  }
+                	  else {
+                		  strcat(formatString,"%r,%r,[%s%r]");
+                		  my_sprintf(state, state->operandBuffer, formatString, fieldB, fieldB, strType, fieldC);
+                	  }
+            	  }
+            	  else {
+                	  if (c == 0) {
+                    	  switch (type) {
+                    	  case 5:
+                      		  strcat(formatString,"[%s%r]");
+                          	  my_sprintf(state, state->operandBuffer, formatString, strType, fieldC);
+                    		  break;
+                    	  default:
+                    		  strcat(formatString,"%r,[%s%r]");
+                    		  my_sprintf(state, state->operandBuffer, formatString, fieldB, strType, fieldC);
+                    		  break;
+                    	  }
+                	  }
+                	  else {
+                		  if ((type == 0) || (type == 6) || (type == 7))
+                			  strcat(formatString,"[cm:GPA2],%r,[%s%r]");
+                		  else
+                			  strcat(formatString,"[cm:GPA1],%r,[%s%r]");
+                    	  my_sprintf(state, state->operandBuffer, formatString, fieldB, strType, fieldC);
+                	  }
+                  }
+          		  break;
+          	  case 14:
+          	  case 15:
+          	  case 23:
+          	  case 27:
+          	  case 28:
+          	  case 30:
+          	  case 31:
+                  if ( ps == 0 ) {
+            		  if (subOpcode == 31) {
+                		  strcat(formatString,"%r,%r,[cm:GPA2],[%s%r]");
+                		  my_sprintf(state, state->operandBuffer, formatString, fieldB, fieldB, strType, fieldC);
+            		  }
+            		  else if (subOpcode == 30) {
+                		  strcat(formatString,"%r,[cm:GPA2],%r,[%s%r]");
+                		  my_sprintf(state, state->operandBuffer, formatString, fieldB, fieldB, strType, fieldC);
+            		  }
+            		  else {
+            			  strcat(formatString,"%r,[cm:GPA2],[%s%r]");
+            			  my_sprintf(state, state->operandBuffer, formatString, fieldB, strType, fieldC);
+            		  }
+                  }
+                  else {
+                	  switch (type) {
+                	  case 5:
+                  		  strcat(formatString,"%r,[%s%r]");
+                      	  my_sprintf(state, state->operandBuffer, formatString, fieldB, strType, fieldC);
+                		  break;
+                	  default:
+                		  if (((subOpcode == 30) || (subOpcode == 31)) && (c == 0)) {
+                			  strcat(formatString,"%r,[%s%r]");
+                			  my_sprintf(state, state->operandBuffer, formatString, fieldB, strType, fieldC);
+                		  }
+                		  else {
+                			  if (subOpcode == 31) {
+                    			  strcat(formatString,"%r,[cm:GPA2],[%s%r]");
+                    			  my_sprintf(state, state->operandBuffer, formatString, fieldB, strType, fieldC);
+                			  }
+                			  else if (subOpcode == 30) {
+                    			  strcat(formatString,"[cm:GPA2],%r,[%s%r]");
+                    			  my_sprintf(state, state->operandBuffer, formatString, fieldB, strType, fieldC);
+                			  }
+                			  else {
+                				  strcat(formatString,"[cm:GPA2],[%s%r]");
+                				  my_sprintf(state, state->operandBuffer, formatString, strType, fieldC);
+                			  }
+                		  }
+            		  break;
+                	  }
+                  }
+           		  break;
+          	  case 8:
+      	  	  case 17:
+      	  		  if (type == 6) {
+      	  			  if (ps == 0) {
+  				  		strcat(formatString,"%r,[cm:GPA2],%r,[%s%r]");
+              	 	  		my_sprintf(state, state->operandBuffer, formatString, fieldB, fieldB, strType, fieldC);
+      	  			  }
+      	  			  else {
+      	  				  if (c == 0) {
+      	  					  switch (type) {
+      	  					  case 5:
+      	  						  strcat(formatString,"%r,[%s%r]");
+      	  						  my_sprintf(state, state->operandBuffer, formatString, fieldB, strType, fieldC);
+      	  						  break;
+      	  					  default:
+      	  						  strcat(formatString,"%r,[%s%r]");
+      	  						  my_sprintf(state, state->operandBuffer, formatString, fieldB, strType, fieldC);
+      	  						  break;
+      	  					  }
+      	  				  }
+      	  				  else {
+      	  					  if ((type == 0) || (type == 7) || (type == 2) || (type == 6))
+      	  						  strcat(formatString,"[cm:GPA2],%r,[%s%r]");
+      	  					  else
+      	  						  strcat(formatString,"[cm:GPA1],%r,[%s%r]");
+      	  					  my_sprintf(state, state->operandBuffer, formatString, fieldB, strType, fieldC);
+      	  				  }
+      	  			  }
+      	  		  }
+      	  		  else {
+	                     if ( ps == 0 ) {
+	                    	 if (subOpcode == 17){
+	                    		 if ((type == 0) || (type == 7))
+	                    			 strcat(formatString,"%r,[cm:GPA2],[%s%r]");
+	                    		 else
+	                    			 strcat(formatString,"%r,[cm:GPA1],[%s%r]");
+	                          	  my_sprintf(state, state->operandBuffer, formatString, fieldB, strType, fieldC);
+        	            	 }
+                	    	 else {
+                      			  strcat(formatString,"%r,[%s%r]");
+                          		  my_sprintf(state, state->operandBuffer, formatString, fieldB, strType, fieldC);
+	                    	 }
+                      }
+                      else {
+                    	  if (((subOpcode == 17) && (c == 0)) || ((subOpcode == 8) && (type == 5))){
+                      		  strcat(formatString,"[%s%r]");
+                          	  my_sprintf(state, state->operandBuffer, formatString, strType, fieldC);
+                    	  }
+                    	  else {
+                    		  if ((type == 0) || (type == 7))
+                    			  strcat(formatString,"[cm:GPA2],[%s%r]");
+                    		  else
+                    			  strcat(formatString,"[cm:GPA1],[%s%r]");
+                          	  my_sprintf(state, state->operandBuffer, formatString, strType, fieldC);
+                    	  }
+                      }
+      	  		  }
+      	  		  break;
+      	  	  case 18:
+      	  	  case 19:
+      	  	  case 20:
+          	  case 21:
+          	  case 22:
+                  if ( ps == 0 ) {
+                	  if (((type == 0) || (type == 7)) && (c == 1))
+                			  strcat(formatString,"%r,[cm:GPA2],[%s%r]");
+                	  else {
+                		  if (((subOpcode == 22) || (subOpcode == 21)) && (c == 0))
+                			  strcat(formatString,"%r,[%s%r]");
+                		  else
+                			  strcat(formatString,"%r,[cm:GPA1],[%s%r]");
+                	  	  }
+                	  my_sprintf(state, state->operandBuffer, formatString, fieldB, strType, fieldC);
+                  }
+                  else {
+                	  if ((subOpcode == 18) && (c == 0)) {
+                  		  strcat(formatString,"[%s%r]");
+                      	  	  my_sprintf(state, state->operandBuffer, formatString, strType, fieldC);
+                	  }
+                	  else {
+                		  if ((subOpcode == 19) || (subOpcode == 20) || (subOpcode == 21) || ((subOpcode == 22) && ((type == 6) || (type == 7)))) {
+                			  if (c == 0)
+                				  strcat(formatString,"[%s%r]");
+                			  else {
+                				  if ((type == 0) || (type == 7))
+                					  strcat(formatString,"[cm:GPA2],[%s%r]");
+                				  else
+                					  strcat(formatString,"[cm:GPA1],[%s%r]");
+                			  }
+            				  my_sprintf(state, state->operandBuffer, formatString, strType, fieldC);
+                		  }
+                		  else
+                			  if (subOpcode == 22) {
+                				  if ((c == 1) && (di == 1))
+                						  strcat(formatString,"[cm:GPA1],[%s%r]");
+                				  else
+                					  strcat(formatString,"[%s%r]");
+                				  my_sprintf(state, state->operandBuffer, formatString, strType, fieldC);
+                			  }
+                			  else {
+                				  if ((type == 0) || (type == 7))
+                					  strcat(formatString,"[cm:GPA2],[%s%r]");
+                				  else
+                					  strcat(formatString,"[cm:GPA1],[%s%r]");
+                				  my_sprintf(state, state->operandBuffer, formatString, strType, fieldC);
+                			  }
+                	  }
+                  }
+                  break;
+          	  default:
+                  if ( ps == 0 ) {
+               		  strcat(formatString,"%r,%r,[%s%r]");
+                   	  my_sprintf(state, state->operandBuffer, formatString, fieldB, fieldB, strType, fieldC);
+                  }
+                  else {
+              		  strcat(formatString,"%r,[%s%r]");
+                  	  my_sprintf(state, state->operandBuffer, formatString, fieldB, strType, fieldC);
+                  }
+                  break;
+          }
+    	  break;
+      }
+    case 76:
+        {
+        	int subOpc1;
+        	int subOpc2;
+        	int type;
+        	int src2 = 0;
+        	int src1 = 1;
+        	fieldA = 62; // dummy value only to update limm_value
+            CHECK_FIELD(fieldA);
+        	fieldA = BITS(state->words[0],21,26);
+        	fieldB = BITS(state->words[0],16,20);
+        	fieldC = BITS(state->words[0],11,15);
+           	fieldAisReg = 1;
+           	fieldBisReg = 1;
+           	fieldCisReg = 1;
+           	if ( fieldA == 62 ) {
+           		fieldA = 0;
+           		fieldAisReg = 0;
+           	}
+            subOpc1 = BITS(state->words[0],0,4);
+        	type = ((limm_value & 0xe0000000) >> 29) & 0x07;
+        	subOpc2 = limm_value & 0x0000000f;
+			switch (subOpc1) {
+			    case 30:
+				case 29:
+				case 28:
+				case 27:
+					src2 = 1;
+					break;
+				case 23:
+					src1 = 0;
+					src2 = 1;
+					break;
+				case 25:
+					switch (subOpc2) {
+	        	      case 0:
+	        	    	switch (type) {
+	        	    		case 0: instrName = "scrst_0"; break;
+	        	    		case 1: instrName = "dcrst_0"; break;
+	        	    		case 2: instrName = "tbcrst_0"; break;
+	        	    		default: instrName = "?crst_0"; break;
+	        	    	}
+	        	    	break;
+	        	      case 1:
+	        	    	src2 = 1;
+	           	    	switch (type) {
+	            	    	case 0: instrName = "scadd_0"; break;
+	            	    	case 1: instrName = "dcadd_0"; break;
+	            	    	case 2: instrName = "tbcadd_0"; break;
+	            	    	default: instrName = "?cadd_0"; break;
+	            	    }
+	        	    	break;
+	        	      case 2:
+	        	    	switch (type) {
+	        	    		case 0: instrName = "scinc_0"; break;
+	        	    		case 1: instrName = "dcinc_0"; break;
+	        	    		case 2: instrName = "tbcinc_0"; break;
+	        	    		default: instrName = "?cinc_0"; break;
+	        	    	}
+	        	    	break;
+	        	      case 3:
+	        	    	src2 = 1;
+	           	    	switch (type) {
+	            	    	case 0: instrName = "scsub_0"; break;
+	            	    	case 1: instrName = "dcsub_0"; break;
+	            	    	case 2: instrName = "tbcsub_0"; break;
+	            	    	default: instrName = "?csub_0"; break;
+	            	    }
+	        	    	break;
+	        	      case 4:
+	        	    	switch (type) {
+	        	    		case 0: instrName = "scdec_0"; break;
+	        	    		case 1: instrName = "dcdec_0"; break;
+	        	    		case 2: instrName = "tbcdec_0"; break;
+	        	    		default: instrName = "?cdec_0"; break;
+	        	    	}
+	        	    	break;
+	        	      case 5:
+	        	    	src2 = 1;
+	           	    	switch (type) {
+	            	    	case 0: instrName = "scld_0"; break;
+	            	    	case 1: instrName = "dcld_0"; break;
+	            	    	default: instrName = "?cld_0"; break;
+	            	    }
+	        	    	break;
+	        	      case 6:
+	        	    	src2 = 1;
+	           	    	switch (type) {
+	            	    	case 0: instrName = "scst_0"; break;
+	            	    	case 1: instrName = "dcst_0"; break;
+	            	    	default: instrName = "?cst_0"; break;
+	            	    }
+	        	    	break;
+	        	      case 7:
+	        	    	switch (type) {
+	        	    		case 2: instrName = "tbcolor_0"; break;
+	        	    		default: instrName = "?color_0"; break;
+	        	    	}
+	        	    	break;
+					}
+					break;
+			}
+    	    write_instr_name();
+    	    WRITE_FORMAT_x(A);
+    	    WRITE_FORMAT_COMMA_x(B);
+    	    if ( src2 == 0 ) {
+        	    my_sprintf(state, state->operandBuffer, formatString, fieldA, fieldB);
+    	    }
+    	    else if (src1 == 0)
+    	    	my_sprintf(state, state->operandBuffer, formatString, fieldA, fieldC);
+    	    else {
+        	    WRITE_FORMAT_COMMA_x(C);
+        	    my_sprintf(state, state->operandBuffer, formatString, fieldA, fieldB, fieldC);
+            }
+    	}
+    	break;
+    case 77:
+      {
+          int type;
+          int size;
+          int off_sel;
+          int entry_sel;
+          int imm_entry;
+          int imm_off;
+          int ps;
+          char name[20];
+          char *dstStr;
+          char *srcStr;
+          int   numSp;
+          int   numDp;
+          int   mode;
+          int   swap_bc;
+          int   na;
+          type = (state->words[0] & 0x000000e0) >> (5-1); // include ld/st bit
+          type |= (state->words[0] & 0x00000001);
+          size = (state->words[0] & 0x00000100) >> 8;
+          na = (state->words[0] & 0x00000200) >> 9;
+          off_sel = (state->words[0] & 0x00000002) >> 1;
+          entry_sel = (state->words[0] & 0x00004000) >> 14;
+          imm_entry = (state->words[0] & 0x0000001C) >> 2;
+          imm_off = (state->words[0] & 0x00003C00) >> 10;
+          ps = (state->words[0] & 0x00008000) >> 15;
+          imm_off *= 16;
+          imm_entry = 16 << imm_entry;
+          FIELD_C_AC16();
+          FIELD_B_AC16();
+          strcpy(name,"cp");
+          switch (size) {
+          	  case 0: strcat(name,"16"); break;
+          	  case 1: strcat(name,"32"); break;
+          }
+          if ( na != 0 ) strcat(name,".na");
+          dstStr = srcStr = "??:";
+          numDp = numSp = 1;
+          mode = 0;
+          swap_bc = 0;
+          switch (type ) {
+          	  case 2: // phy + load
+          		  dstStr = "cm:";
+          		  srcStr = "xa:";
+          		  off_sel = 0;
+          		  break;
+          	  case 3: // phy + store
+          		  dstStr = "xa:";
+          		  srcStr = "cm:";
+          		  off_sel = 0;
+          		  swap_bc = 1;
+          		  break;
+          	  case 4: // jd
+          		  dstStr = "cm:";
+          		  srcStr = "jid:";
+          		  off_sel = 0;
+          		  break;
+          	  case 5: // jd + store
+          		  dstStr = "jid:";
+          		  srcStr = "cm:";
+          		  off_sel = 0;
+          		  swap_bc = 1;
+          		  break;
+          	  case 6:
+          		  mode = 1;
+          		  numSp  = 2;
+          		  dstStr = "cm:";
+          		  srcStr = "sd:";
+          		  break;
+          	  case 7:
+          		  mode = 1;
+          		  numDp  = 2;
+          		  dstStr = "sd:";
+          		  srcStr = "cm:";
+          		  swap_bc = 1;
+          		  break;
+          	  case 8:
+          		  mode = 1;
+          		  numSp  = 2;
+          		  dstStr = "cm:";
+          		  srcStr = "xd:";
+          		  break;
+          	  case 9:
+          		  mode = 1;
+          		  numDp  = 2;
+          		  dstStr = "xd:";
+          		  srcStr = "cm:";
+          		  swap_bc = 1;
+          		  break;
+          	  case 10: // uip
+          		  strcpy(name,"uip");
+          		  if (na) strcat(name,".na");
+          		  dstStr = "cm:";
+          		  srcStr = "cm:";
+          		  off_sel = 0;
+          		  entry_sel = 0;
+          		  break;
+
+          }
+          instrName = name;
+ 	      write_instr_name();
+ 	      if ( mode == 0 ) {  // mode = 0
+ 	          if ( numSp == 2 ) {  // mode = 0 && numSp = 2
+ 	        	  if ( ps == 0 ) { // mode = 0 && numSp = 2 && ps = 0
+ 	        		  if ( off_sel == 0 ) {  // mode = 0 && numSp == 2 && ps = 0 && off_sel = 0
+ 	        			  strcat(formatString,"%r,[%s%r],[%s%r,%r]");
+ 	        			  my_sprintf(state, state->operandBuffer, formatString, fieldB, dstStr, fieldC, srcStr, fieldB, fieldC);
+ 	        		  }
+ 	        		  else { // mode = 0 && numSp = 2 && ps = 0 && off_sel != 0
+ 	        			  strcat(formatString,"%r,[%s%r],[%s%r,%d]");
+ 	        			  my_sprintf(state, state->operandBuffer, formatString, fieldB, dstStr, fieldC, srcStr, fieldB, imm_off);
+ 	        		  }
+ 	        	  }
+ 	        	  else {  // mode = 0 && numSp = 2 && ps != 0
+ 	        		  if ( off_sel == 0 ) { // mode = 0 && numSp == 2 && ps != 0 && off_sel = 0
+ 	        			  strcat(formatString,"[%s%r],[%s%r,%r]");
+ 	        			  my_sprintf(state, state->operandBuffer, formatString, dstStr, fieldC, srcStr, fieldB, fieldC);
+ 	        		  }
+ 	        		  else { // mode = 0 && numSp = 2 && ps != 0 && off_sel != 0
+ 	        			  strcat(formatString,"[%s%r],[%s%r,%d]");
+ 	        			  my_sprintf(state, state->operandBuffer, formatString, dstStr, fieldC, srcStr, fieldB, imm_off);
+ 	        		  }
+ 	        	  }
+ 	          }
+ 	          else { // mode = 0 && numSp = 1
+ 	        	  if ( ps == 0 ) { // mode = 0 && numSp = 1 && ps = 0
+ 	        		  if ( off_sel == 0 ) { // mode = 0 && numSp = 1 && ps = 0 && off_sel = 0
+ 	        			  strcat(formatString,"%r,[%s%r],[%s%r]");
+ 	        			  my_sprintf(state, state->operandBuffer, formatString, fieldB, dstStr, fieldC, srcStr, fieldB);
+ 	        		  }
+ 	        		  else { // mode = 0 && numSp = 1 && ps = 0 && off_sel != 0
+ 	        			  strcat(formatString,"%r,[%s%r],[%s%d]");
+ 	        			  my_sprintf(state, state->operandBuffer, formatString, fieldB, dstStr, fieldC, srcStr, imm_off);
+ 	        		  }
+ 	        	  }
+ 	        	  else { // mode = 0 && numSp = 1 && ps != 0
+ 	        		  if ( off_sel == 0 ) { // mode = 0 && numSp = 1 && ps != 0 && off_sel = 0
+ 	        			  if ( numDp == 1 ) { // mode = 0 && numSp = 1 && ps != 0 && off_sel = 0 && numDp = 1
+ 	        				  strcat(formatString,"[%s%r],[%s%r]");
+ 	        				  if ( swap_bc == 0) {
+ 	        					  my_sprintf(state, state->operandBuffer, formatString, dstStr, fieldC, srcStr, fieldB);
+ 	        				  }
+ 	        				  else {
+ 	        					  my_sprintf(state, state->operandBuffer, formatString, dstStr, fieldB, srcStr, fieldC);
+ 	        				  }
+ 	        			  }
+ 	        			  else { // mode = 0 && numSp = 1 && ps != 0 && off_sel = 0 && numDp = 2
+ 	        				  strcat(formatString,"[%s%r,%r],[%s%r]");
+ 	        				  my_sprintf(state, state->operandBuffer, formatString, dstStr, fieldB, fieldC, srcStr, fieldC);
+ 	        			  }
+ 	        		  }
+ 	        		  else { // mode = 0 && numSp = 1 && ps != 0 && off_sel != 0
+ 	        			  if ( numDp == 1 ) { // mode = 0 && numSp = 1 && ps != 0 && off_sel != 0 && numDp = 1
+ 	        				  strcat(formatString,"[%s%r],[%s%d]");
+ 	        				  my_sprintf(state, state->operandBuffer, formatString, dstStr, fieldC, srcStr, imm_off);
+ 	        			  }
+ 	        			  else { // mode = 0 && numSp = 1 && ps != 0 && off_sel != 0 && numDp = 2
+ 	        				  strcat(formatString,"[%s%r,%d],[%s%r]");
+ 	        				  my_sprintf(state, state->operandBuffer, formatString, dstStr, fieldB, imm_off, srcStr, fieldC);
+ 	        			  }
+ 	        		  }
+ 	        	  }
+ 	          }
+ 	      }
+ 	      else { // mode = 1
+	          if ( ps == 0 ) { // mode = 1 && ps = 0
+	        	  if ( off_sel == 0 ) { // mode = 1 && ps = 0 && off_sel = 0
+	        		  if ( entry_sel == 0 ) { // mode = 1 && ps = 0 && off_sel = 0 && entry_sel = 0
+	        			  strcat(formatString,"%r,[%s%r],[%s%r,%r,%r]");
+	        			  my_sprintf(state, state->operandBuffer, formatString, fieldB, dstStr, fieldC, srcStr, fieldB, fieldC, fieldC);
+	        		  }
+	        		  else { // mode = 1 && ps = 0 && off_sel = 0 && entry_sel != 0
+	        			  strcat(formatString,"%r,[%s%r],[%s%r,%d,%r]");
+	        			  my_sprintf(state, state->operandBuffer, formatString, fieldB, dstStr, fieldC, srcStr, fieldB, imm_entry, fieldC);
+	        		  }
+	        	  }
+	        	  else { // mode = 1 && ps = 0 && off_sel != 0
+	        		  if ( entry_sel == 0 ) { // mode = 1 && ps = 0 && off_sel != 0 && entry_sel = 0
+	        			  strcat(formatString,"%r,[%s%r],[%s%r,%r,%d]");
+	        			  my_sprintf(state, state->operandBuffer, formatString, fieldB, dstStr, fieldC, srcStr, fieldB, fieldC, imm_off);
+	        		  }
+	        		  else { // mode = 1 && ps = 0 && off_sel != 0 && entry_sel != 0
+	        			  strcat(formatString,"%r,[%s%r],[%s%r,%d,%d]");
+	        			  my_sprintf(state, state->operandBuffer, formatString, fieldB, dstStr, fieldC, srcStr, fieldB, imm_entry, imm_off);
+	        		  }
+	        	  }
+	          }
+	          else { // mode = 1 && ps != 0
+	        	  if ( off_sel == 0 ) { // mode = 1 && ps != 0 && off_sel = 0
+	        		  if ( entry_sel == 0 ) { // mode = 1 && ps != 0 && off_sel = 0 && entry_sel = 0
+ 	        			  if ( numDp == 1 ) { // mode = 1 && ps != 0 && off_sel = 0 && entry_sel = 0 && numDp = 1
+ 	        				  strcat(formatString,"[%s%r],[%s%r,%r,%r]");
+ 	        				  my_sprintf(state, state->operandBuffer, formatString, dstStr, fieldC, srcStr, fieldB, fieldC, fieldC);
+ 	        			  }
+ 	        			  else {  // mode = 1 && ps != 0 && off_sel = 0 && entry_sel = 0 && numDp = 2
+ 	        				  strcat(formatString,"[%s%r,%r,%r],[%s%r]");
+ 	        				  my_sprintf(state, state->operandBuffer, formatString, dstStr, fieldB, fieldC, fieldC, srcStr, fieldC);
+ 	        			  }
+	        		  }
+	        		  else { // mode = 1 && ps != 0 && off_sel = 0 && entry_sel != 0
+ 	        			  if ( numDp == 1 ) { // mode = 1 && ps != 0 && off_sel = 0 && entry_sel != 0 && numDp = 1
+ 	        				  strcat(formatString,"[%s%r],[%s%r,%d,%r]");
+ 	        				  my_sprintf(state, state->operandBuffer, formatString, dstStr, fieldC, srcStr, fieldB, imm_entry, fieldC);
+ 	        			  }
+ 	        			  else {  // mode = 1 && ps != 0 && off_sel = 0 && entry_sel != 0 && numDp = 2
+ 	        				  strcat(formatString,"[%s%r,%d,%r],[%s%r]");
+ 	        				  my_sprintf(state, state->operandBuffer, formatString, dstStr, fieldB, imm_entry, fieldC, srcStr, fieldC);
+ 	        			  }
+	        		  }
+	        	  }
+	        	  else { // mode = 1 && ps != 0 && off_sel != 0
+	        		  if ( entry_sel == 0 ) { // mode = 1 && ps != 0 && off_sel != 0 && entry_sel = 0
+ 	        			  if ( numDp == 1 ) { // mode = 1 && ps != 0 && off_sel != 0 && entry_sel = 0 && numDp = 1
+ 	        				  strcat(formatString,"[%s%r],[%s%r,%r,%d]");
+ 	        				  my_sprintf(state, state->operandBuffer, formatString, dstStr, fieldC, srcStr, fieldB, fieldC, imm_off);
+ 	        			  }
+ 	        			  else { // mode = 1 && ps != 0 && off_sel != 0 && entry_sel = 0 && numDp = 1
+ 	        				  strcat(formatString,"[%s%r,%r,%d],[%s%r]");
+ 	        				  my_sprintf(state, state->operandBuffer, formatString, dstStr, fieldB, fieldC, imm_off, srcStr, fieldC);
+ 	        			  }
+	        		  }
+	        		  else { // mode = 1 && ps != 0 && off_sel != 0 && entry_sel != 0
+ 	        			  if ( numDp == 1 ) { // mode = 1 && ps != 0 && off_sel != 0 && entry_sel != 0 && numDp = 1
+ 	        				  strcat(formatString,"[%s%r],[%s%r,%d,%d]");
+ 	        				  my_sprintf(state, state->operandBuffer, formatString, dstStr, fieldC, srcStr, fieldB, imm_entry, imm_off);
+ 	        			  }
+ 	        			  else {  // mode = 1 && ps != 0 && off_sel != 0 && entry_sel != 0 && numDp = 2
+ 	        				  strcat(formatString,"[%s%r,%d,%d],[%s%r]");
+ 	        				  my_sprintf(state, state->operandBuffer, formatString, dstStr, fieldB, imm_entry, imm_off, srcStr, fieldC);
+ 	        			  }
+	        		  }
+	        	  }
+	          }
+ 	      }
+          break;
+      }
+    case 78:
+      {
+    	   int subOpc2;
+    	   int sri;
+    	   int imm_size;
+    	   int shash_pad;
+    	   int shash_init;
+    	   int type;
+    	   int hm;
+           char name[20];
+           int modePrint;
+    	   subOpc2 = (state->words[0] & 0x00000007);
+    	   sri = (state->words[0] & 0x00000008) >> 3;
+    	   shash_pad = (state->words[0] & 0x00000010) >> 4;
+    	   shash_init = (state->words[0] & 0x00002000) >> 13;
+    	   imm_size = (state->words[0] & 0x00001FE0) >> 5;
+    	   type = (state->words[0] & 0x000000f8) >> 3;
+    	   hm  = (state->words[0] & 0x00004000) >> 14;
+           FIELD_C_AC16();
+           FIELD_B_AC16();
+           strcpy(name,instrName);
+           if ( subOpc2 == 4 ) {
+        	   switch ( type ) {
+        	       case 0x08: strcpy(name,"cpssta");   modePrint = 1; break;
+        	       case 0x00: strcpy(name,"cpssta");   modePrint = 2; break;
+        	       case 0x0a: strcpy(name,"cpsiv") ;   modePrint = 1; break;
+        	       case 0x02: strcpy(name,"cpsiv") ;   modePrint = 2; break;
+        	       case 0x0c: strcpy(name,"cpsmac");   modePrint = 1; break;
+        	       case 0x04: strcpy(name,"cpsmac");   modePrint = 2; break;
+        	       case 0x09: strcpy(name,"cpskey");   modePrint = 1; break;
+        	       case 0x01: strcpy(name,"cpskey");   modePrint = 2; break;
+        	       case 0x0b: strcpy(name,"cpsctx");   modePrint = 1; break;
+        	       case 0x03: strcpy(name,"cpsctx");   modePrint = 2; break;
+        	       default:
+        	    	   sprintf(name,"?%02xsec",type); break;
+        	   }
+           }
+           if ( subOpc2 == 2 ) {
+        	   if (hm) {
+        		   if (shash_pad)
+    					strcpy(name,"hmac.opad");
+        		   else
+        			   strcpy(name,"hmac.ipad");
+        	   }
+           }
+
+           instrName = name;
+  	       write_instr_name();
+    	   switch (subOpc2) {
+	       	   case 0:
+	       	   case 1:
+	       		   if ( sri == 0 ) {
+	       			   strcat(formatString,"%r,[cm:%r],[cm:%r],%r");
+	       			   my_sprintf(state, state->operandBuffer, formatString, fieldC, fieldB, fieldB, fieldC);
+	       		   }
+	       		   else {
+	       			   strcat(formatString,"%r,[cm:%r],[cm:%r],%d");
+	       			   my_sprintf(state, state->operandBuffer, formatString, fieldC, fieldB, fieldB, imm_size);
+	       		   }
+	       		   break;
+	       	   case 2:
+	       		   if ( sri == 0 ) {
+	       			   if (hm) {
+		       			   strcat(formatString,"%r,[cm:%r],%r");
+		       			   my_sprintf(state, state->operandBuffer, formatString, fieldC, fieldB, fieldC);
+	       			   }
+	       			   else {
+		       			   strcat(formatString,"%r,[cm:%r],%r,%d,%d");
+		       			   my_sprintf(state, state->operandBuffer, formatString, fieldC, fieldB, fieldC, shash_init, shash_pad);
+	       			   }
+	       		   }
+	       		   else {
+	       			   if (hm) {
+	       				   strcat(formatString,"%r,[cm:%r],%d");
+	       				   my_sprintf(state, state->operandBuffer, formatString, fieldC, fieldB, imm_size);
+	       			   }
+	       			   else {
+	       				   strcat(formatString,"%r,[cm:%r],%d,%d,%d");
+	       				   my_sprintf(state, state->operandBuffer, formatString, fieldC, fieldB, imm_size, shash_init, shash_pad);
+	       			   }
+	       		   }
+	       		   break;
+	       	   case 3:
+	       		   strcat(formatString,"[sm:%r]");
+   		   		   my_sprintf(state, state->operandBuffer, formatString, fieldC);
+   		   		   break;
+	       	   case 4:
+	       		   switch ( modePrint ) {
+	       		   	   case 1:
+	       		   		   strcat(formatString,"[sm:%r],[cm:%r]");
+	       		   		   my_sprintf(state, state->operandBuffer, formatString, fieldC, fieldB);
+	       		   		   break;
+	       		   	   case 2:
+	       		   		   strcat(formatString,"[cm:%r],[sm:%r]");
+	       		   		   my_sprintf(state, state->operandBuffer, formatString, fieldB, fieldC);
+	       		   		   break;
+	       		   	   default:
+	       		   		   strcat(formatString,"???cps");
+	       		   		   my_sprintf(state, state->operandBuffer, formatString);
+	       		   		   break;
+	       		   }
+	       		   break;
+	       	   case 5:
+	       		   if ( sri == 0 ) {
+	       			   strcat(formatString,"%r,[cm:%r],%r");
+	       			   my_sprintf(state, state->operandBuffer, formatString, fieldC, fieldB, fieldC);
+	       		   }
+	       		   else {
+       				   strcat(formatString,"%r,[cm:%r],%d");
+       				   my_sprintf(state, state->operandBuffer, formatString, fieldC, fieldB, imm_size);
+	       		   }
+   		   		   break;
+	       	   case 6:
+	       		   if (sri == 0) {
+	       			   strcat(formatString,"%r,[cm:%r],%r,%d,%d");
+	       			   my_sprintf(state, state->operandBuffer, formatString, fieldC, fieldB, fieldC,shash_init,shash_pad);
+	       		   }
+	       		   else {
+	       			   strcat(formatString,"%r,[cm:%r],%d,%d,%d");
+	       			   my_sprintf(state, state->operandBuffer, formatString, fieldC, fieldB, imm_size,shash_init,shash_pad);
+	       		   }
+	       		   break;
+	       	    default:
+    		   	   strcat(formatString,"???secure");
+    		   	   my_sprintf(state, state->operandBuffer, formatString);
+    		   	   break;
+    	   }
+    	   break;
+      }
+    case 79:
+        FIELD_C();
+        fieldB = 0;
+    	write_instr_name();
+    	strcat(formatString,"%d,[cjid:%r]");
+    	my_sprintf(state, state->operandBuffer, formatString, fieldB,fieldC);
+    	break;
+    case 80:
+      {
+    	  int maxlen;
+    	  int xri;
+    	  int src1;
+   	      maxlen = (state->words[0] & 0x00001FE0) >> 5;
+   	      xri = (state->words[0] & 0x00004000) >> 14;
+   	      src1 = (state->words[0] & 0x00008000) >> 15;
+          FIELD_C_AC16();
+          FIELD_B_AC16();
+          if ( (state->words[0] & 0x00100000) != 0 ) flag = 1;
+          if ( maxlen == 0 ) maxlen = 256;
+ 	      write_instr_name();
+ 	      if ( xri == 0 ) {
+ 	    	  if ( src1 == 0 ) {
+ 	    	    	strcat(formatString,"%r,%r,%d");
+ 	    	    	my_sprintf(state, state->operandBuffer, formatString, fieldB, fieldC, maxlen);
+ 	    	  }
+ 	    	  else {
+	    	    	strcat(formatString,"%r,%r,%r,%d");
+	    	    	my_sprintf(state, state->operandBuffer, formatString, fieldB, fieldB, fieldC, maxlen);
+ 	    	  }
+ 	      }
+ 	      else {
+ 	    	  if ( src1 == 0 ) {
+ 	    	    	strcat(formatString,"%r,%r");
+ 	    	    	my_sprintf(state, state->operandBuffer, formatString, fieldB, fieldC);
+ 	    	  }
+ 	    	  else {
+	    	    	strcat(formatString,"%r,%r,%r");
+	    	    	my_sprintf(state, state->operandBuffer, formatString, fieldB, fieldB, fieldC);
+ 	    	  }
+ 	      }
+      }
+      break;
+    case 81:
+      {
+    	  int usrc1;
+    	  int pos;
+    	  int size;
+    	  usrc1 = (state->words[0] & 0x00008000) >> 15;
+    	  size = (state->words[0] & 0x00007C00) >> 10;
+   	      pos = (state->words[0] & 0x000003E0) >> 5;
+          FIELD_C_AC16();
+          FIELD_B_AC16();
+          if ( (state->words[0] & 0x00100000) != 0 ) flag = 1;
+          size++;
+ 	      write_instr_name();
+ 	      if ( usrc1 == 0 ) {
+    	      strcat(formatString,"%r,%r,%d,%d");
+    	      my_sprintf(state, state->operandBuffer, formatString, fieldB, fieldC, pos,size);
+    	  }
+ 	      else {
+  	    	  strcat(formatString,"%r,%r,%r,%d,%d");
+  	    	  my_sprintf(state, state->operandBuffer, formatString, fieldB, fieldB, fieldC, pos,size);
+ 	      }
+      }
+      break;
+    case 82:
+      {
+    	  int i0,i1,i2,i3;
+    	  int min_hofs,psbc;
+    	  int subOpcode;
+          CHECK_FIELD_C();
+          CHECK_FIELD_B();
+          CHECK_FIELD_A();
+          CHECK_FLAG();
+ 	      write_instr_name();
+ 	 	  WRITE_FORMAT_x(A);
+ 	 	  WRITE_FORMAT_COMMA_x(B);
+ 	 	  subOpcode = BITS(state->words[0],16,21);
+          if (is_limm) {
+        	  switch(subOpcode) {
+        	  case 0x36:
+        		  min_hofs = (limm_value >> 0) & 0xF;
+        		  psbc = (limm_value >> 5) & 0x1;
+        		  strcat(formatString,",%d,%d");
+        		  my_sprintf(state, state->operandBuffer, formatString, fieldA, fieldB, min_hofs, psbc);
+        		  break;
+        	  default:
+        		  i0 = (limm_value >>  0) & 0x0FF;
+        		  i1 = (limm_value >>  8) & 0x0FF;
+        		  i2 = (limm_value >> 16) & 0x0FF;
+        		  i3 = (limm_value >> 24) & 0x0FF;
+        		  strcat(formatString,",%d,%d,%d,%d");
+        		  my_sprintf(state, state->operandBuffer, formatString, fieldA, fieldB, i0, i1,i2,i3);
+        		  break;
+        	  }
+          }
+          else {
+  	         switch(subOpcode) {
+  	         case 0x36:
+  	        	 if (BITS(state->words[0],22,23) == 1) {
+  	  	        	 min_hofs = (BITS(state->words[0],6,9)) * 16;
+  	  	        	 psbc = BITS(state->words[0],11,11);
+  	  	        	 strcat(formatString,",%d,%d");
+  	  	        	 my_sprintf(state, state->operandBuffer, formatString, fieldA, fieldB, min_hofs, psbc);
+  	        	 }
+  	        	 else {
+  	        		 WRITE_FORMAT_COMMA_x(C);
+  	        		 my_sprintf(state, state->operandBuffer, formatString, fieldA, fieldB, fieldC);
+  	        	 }
+  	        	 break;
+  	         default:
+  	        	 WRITE_FORMAT_COMMA_x(C);
+  	        	 WRITE_NOP_COMMENT();
+  	        	 my_sprintf(state, state->operandBuffer, formatString, fieldA, fieldB, fieldC);
+  	        	 break;
+  	         }
+          }
+      }
+      break;
+    case 83:
+      {
+    	int subop2;
+
+      	fieldA = 62; // dummy value only to update limm_value
+        CHECK_FIELD(fieldA);
+      	fieldA = BITS(state->words[0],21,26);
+      	fieldB = BITS(state->words[0],16,20);
+      	fieldC = BITS(state->words[0],11,15);
+       	fieldAisReg = 1;
+       	if ( fieldA == 62 ) {
+       		fieldA = 0;
+       		fieldAisReg = 0;
+       	}
+       	subop2 = (limm_value & 0xffff0000) >> 16;
+       	write_instr_name();
+       	WRITE_FORMAT_x(A);
+       	if (BITS(limm_value,15,15)) {
+        	int size1_64 = (limm_value & 0xff) >> 0;
+       		strcat(formatString,",[cm:%r],[cm:%r],%r,%d,%d");
+       		my_sprintf(state, state->operandBuffer, formatString, fieldA, fieldB, fieldB, fieldC, size1_64, subop2);
+       	}
+       	else{
+       		strcat(formatString,",[cm:%r],[cm:%r],%r,%d");
+       		my_sprintf(state, state->operandBuffer, formatString, fieldA, fieldB, fieldB, fieldC, subop2);
+       	}
+      }
+      break;
+    case 84:
+      {
+     	  CHECK_FIELD_A();
+    	  CHECK_FIELD_B();
+    	  CHECK_FIELD_C();
+
+    	  write_instr_name();
+    	  WRITE_FORMAT_x(A);
+
+    	  if (is_limm) {
+    	   	  int ops, sid, keysize, res_len;
+
+    	   	  sid = (limm_value & 0x7f00) >> 8;
+    	   	  keysize = (limm_value & 0x7f) >> 0;
+    	   	  if (BITS(state->words[0],16,21) == 0x31){//lkpitcm
+    	   		  ops = (limm_value & 0x1ff8000) >> 19;
+    	   		  strcat(formatString,",[cm:%r],[cm:%r],%d,%d,%d");
+    	   		  my_sprintf(state, state->operandBuffer, formatString, fieldA, fieldB, fieldB, sid, ops, keysize);
+    	   	  }
+       	   	  else {//lkpetcm
+       	   		  ops = (limm_value & 0xc00000) >> 22;
+       	   		  res_len = (limm_value & 0xff000000) >> 24;
+       	   		  strcat(formatString,",[cm:%r],[cm:%r],%d,%d,%d,%d");
+    	 		  my_sprintf(state, state->operandBuffer, formatString, fieldA, fieldB, fieldB, sid, ops, keysize,res_len);
+       	   	  }
+    	  }
+    	  else {
+    		  strcat(formatString,",[cm:%r],[cm:%r],%r");
+    		  my_sprintf(state, state->operandBuffer, formatString, fieldA, fieldB, fieldB, fieldC);
+    	  }
+      }
+      break;
+    case 85:
+      {
+    	  int subop2;
+    	  int m, p, na, x;
+    	  int os, es, ss;
+    	  char *dstStr;
+    	  char *srcStr;
+    	  char name[20] = {"cp"};
+    	  int entry_size_val, offset_val, size_val;
+
+    	  fieldA = 62; // dummy value only to update limm_value
+    	  CHECK_FIELD(fieldA);
+    	  fieldA = BITS(state->words[0],21,26);
+    	  fieldB = BITS(state->words[0],16,20);
+    	  fieldC = BITS(state->words[0],11,15);
+          if ( fieldA == 62 ) {
+        	  fieldA = 0;
+        	  fieldAisReg = 0;
+          }
+          else
+              fieldAisReg = 1;
+
+          subop2 = (limm_value >> 29) & 0x7;
+    	  switch (subop2) {
+    	  case 4:
+    		  dstStr = "csd"; srcStr = "cm";
+    		  break;
+    	  case 5:
+    		  dstStr = "cxd"; srcStr = "cm";
+    		  break;
+    	  case 6:
+    		  dstStr = "cm"; srcStr = "csd";
+    		  break;
+    	  case 7:
+    		  dstStr = "cm"; srcStr = "cxd";
+    		  break;
+    	  default:
+    		  dstStr = "??"; srcStr = "??";
+    		  break;
+    	  }
+
+    	  os = (limm_value >> 25) & 0x1;
+    	  es = (limm_value >> 26) & 0x1;
+    	  ss = (limm_value >> 27) & 0x1;
+
+    	  m = (limm_value & 0x10000000) >> 28;
+    	  na = (limm_value & 0x01000000) >> 24;
+    	  x = (limm_value & 0x00800000) >> 23;
+      	  if ( m != 0 ) strcat(name,".m");
+      	  if ( na != 0 ) strcat(name,".na");
+      	  if ( x != 0 ) strcat(name,".x");
+
+    	  offset_val = os ? ((limm_value >> 10) & 0x3ff) : fieldC;
+    	  entry_size_val = es ? (16 << ((limm_value >> 20) & 0x7)) : fieldC;
+    	  size_val = ss ? ((limm_value >> 0) & 0x3ff) : fieldC;
+
+      	  instrName = name;
+      	  write_instr_name();
+      	  WRITE_FORMAT_x(A);
+      	  if (subop2 == 6 || subop2 == 7) {
+          	  strcat(formatString,",[%s:%r");
+          	  strcat(formatString,es ? ",%d" : ",%r");
+          	  strcat(formatString,os ? ",%d]" : ",%r]");
+          	  strcat(formatString,",[%s:%r]");
+          	  strcat(formatString,ss ? ",%d" : ",%r");
+    	  	  my_sprintf(state, state->operandBuffer, formatString, fieldA, srcStr, fieldB, entry_size_val, offset_val, dstStr, fieldB, size_val);
+      	  }
+      	  else {
+          	  strcat(formatString,",[%s:%r]");
+          	  strcat(formatString,",[%s:%r");
+          	  strcat(formatString,es ? ",%d" : ",%r");
+          	  strcat(formatString,os ? ",%d]" : ",%r]");
+          	  strcat(formatString,ss ? ",%d" : ",%r");
+          	  my_sprintf(state, state->operandBuffer, formatString, fieldA, srcStr, fieldB, dstStr, fieldB, entry_size_val, offset_val, size_val);
+      	  }
+      }
+      break;
+    case 86:
+    {
+    	FIELD_B();
+        FIELD_C();
+        write_instr_name();
+        WRITE_FORMAT_x_COMMA_LB(B);
+        strcat(formatString, "cm:");
+        WRITE_FORMAT_COMMA_x_RB(C);
+        my_sprintf(state, state->operandBuffer, formatString, fieldB, fieldC);
+    }
+    break;
+    case 87:
+    {
+    	int addrType;
+    	int mcris;
+    	int ersis;
+    	int oris;
+    	int entry_size_val;
+    	int offset_val;
+    	int mntCode;
+    	char *typeStr;
+
+      	fieldA = 62; // dummy value only to update limm_value
+        CHECK_FIELD(fieldA);
+      	fieldA = BITS(state->words[0],21,26);
+      	fieldB = BITS(state->words[0],16,20);
+      	fieldC = BITS(state->words[0],11,15);
+      	fieldA = 0;
+      	fieldAisReg = 0;
+       	addrType = (limm_value & 0x7) >> 0;
+       	mcris = (limm_value & 0x8) >> 3;
+       	ersis = (limm_value & 0x10) >> 4;
+       	oris = (limm_value & 0x20) >> 5;
+       	entry_size_val =  ((limm_value & 0x3f00) >> 8) << 3;
+       	offset_val = (limm_value & 0x3ff0000) >> 16;
+       	mntCode = (limm_value & 0xf0000000) >> 28;
+       	write_instr_name();
+       	WRITE_FORMAT_x(A);
+
+        switch (addrType) {
+        case 0:
+        	typeStr = "";
+        	break;
+        case 1:
+        	typeStr = "xa:";
+        	break;
+        case 3:
+        	typeStr = "sd:";
+        	break;
+        case 4:
+        	typeStr = "xd:";
+        	break;
+        default:
+        	typeStr = "???";
+        	break;
+        }
+        if ((addrType == 0) || (addrType == 1)){
+        	if (mcris == 1) {
+        		strcat(formatString,",[%s%r],%d");
+        		my_sprintf(state, state->operandBuffer, formatString, fieldA, typeStr, fieldB, mntCode);
+        	}
+        	else {
+        		strcat(formatString,",[%s%r],%r");
+        		my_sprintf(state, state->operandBuffer, formatString, fieldA, typeStr, fieldB, fieldC);
+        	}
+        }
+        else { //addrType == 3 || addrType == 4
+        	if ((ersis == 1) && (oris == 1)) {
+        		if (mcris == 1) {
+            		strcat(formatString,",[%s%r,%d,%d],%d");
+            		my_sprintf(state, state->operandBuffer, formatString, fieldA, typeStr, fieldB, entry_size_val, offset_val, mntCode);
+        		}
+        		else { //mcris == 0
+            		strcat(formatString,",[%s%r,%d,%d],%r");
+            		my_sprintf(state, state->operandBuffer, formatString, fieldA, typeStr, fieldB, entry_size_val, offset_val, fieldC);
+        		}
+        	}
+        	else if ((ersis == 1) && (oris == 0)) {
+        		if (mcris == 1) {
+            		strcat(formatString,",[%s%r,%d,%r],%d");
+            		my_sprintf(state, state->operandBuffer, formatString, fieldA, typeStr, fieldB, entry_size_val, fieldC, mntCode);
+        		}
+        		else { //mcris == 0
+            		strcat(formatString,",[%s%r,%d,%r],%r");
+            		my_sprintf(state, state->operandBuffer, formatString, fieldA, typeStr, fieldB, entry_size_val, fieldC, fieldC);
+        		}
+        	}
+        	else if ((ersis == 0) && (oris == 1)) {
+        		if (mcris == 1) {
+            		strcat(formatString,",[%s%r,%r,%d],%d");
+            		my_sprintf(state, state->operandBuffer, formatString, fieldA, typeStr, fieldB, fieldC, offset_val, mntCode);
+        		}
+        		else { //mcris == 0
+            		strcat(formatString,",[%s%r,%r,%d],%r");
+            		my_sprintf(state, state->operandBuffer, formatString, fieldA, typeStr, fieldB, fieldC, offset_val, fieldC);
+        		}
+        	}
+        	else { //ersis == 0 && oris == 0
+        		if (mcris == 1) {
+            		strcat(formatString,",[%s%r,%r,%r],%d");
+            		my_sprintf(state, state->operandBuffer, formatString, fieldA, typeStr, fieldB, fieldC, fieldC, mntCode);
+        		}
+        		else { //mcris == 0
+            		strcat(formatString,",[%s%r,%r,%r],%r");
+            		my_sprintf(state, state->operandBuffer, formatString, fieldA, typeStr, fieldB, fieldC, fieldC, fieldC);
+        		}
+        	}
+        }
+    }
+    break;
+   }
+#endif // #ifdef ARC_NPS_CMDS
 
   default:
     mwerror(state, "Bad decoding class in ARC disassembler");
@@ -4545,10 +7939,12 @@ parse_disassembler_options (char *options)
   const char *p;
   for (p = options; p != NULL; )
     {
+#ifndef ARC_NO_SIMD_CMDS
 	  if (CONST_STRNEQ (p, "simd"))
 	    {
 	      enable_simd = 1;
 	    }
+#endif // #ifndef ARC_NO_SIMD_CMDS
 	  if (CONST_STRNEQ (p, "insn-stream"))
 	    {
 		  enable_insn_stream = 1;
@@ -4599,8 +7995,14 @@ ARCompact_decodeInstr (bfd_vma           address,    /* Address of this instruct
       return -1;
     }
 
+#ifdef ARC_NPS_CMDS
+  if ((((buffer[lowbyte] & 0xf8) > 0x38) && ((buffer[lowbyte] & 0xf8) != 0x48)
+      && ((buffer[lowbyte] & 0xf8) != 0x50) && (((buffer[lowbyte] & 0xf8) != 0x58) || ((buffer[lowbyte+1] & 0x18) == 0x00)))
+      || ((info->mach == bfd_mach_arc_arcv2) && ((buffer[lowbyte] & 0xF8) == 0x48)))
+#else
   if ((((buffer[lowbyte] & 0xf8) > 0x38) && ((buffer[lowbyte] & 0xf8) != 0x48))
       || ((info->mach == bfd_mach_arc_arcv2) && ((buffer[lowbyte] & 0xF8) == 0x48)))
+#endif // #ifdef ARC_NPS_CMDS
   {
     s.instructionLen = 2;
     s.words[0] = (buffer[lowbyte] << 8) | buffer[highbyte];
@@ -4733,7 +8135,14 @@ arcAnalyzeInstr
       return s;
     }
 
+#ifdef ARC_NPS_CMDS
+  if ( ((buffer[lowbyte] & 0xf8) > 0x38) &&
+	   ((buffer[lowbyte] & 0xf8) != 0x48) &&
+	   ((buffer[lowbyte] & 0xf8) != 0x50) &&
+	   ( ((buffer[lowbyte] & 0xf8) != 0x58) || ((buffer[lowbyte+1] & 0x18) == 0x00) ) )
+#else
   if (((buffer[lowbyte] & 0xf8) > 0x38) && ((buffer[lowbyte] & 0xf8) != 0x48))
+#endif // #ifdef ARC_NPS_CMDS
   {
     s.instructionLen = 2;
     s.words[0] = (buffer[lowbyte] << 8) | buffer[highbyte];

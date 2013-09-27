@@ -5741,7 +5741,13 @@ linux_qxfer_libraries_svr4 (const char *annex, unsigned char *readbuf,
 	  libname[0] = '\0';
 	  linux_read_memory (l_name, libname, sizeof (libname) - 1);
 	  libname[sizeof (libname) - 1] = '\0';
-	  if (libname[0] != '\0')
+	  /* Backport patch to upstream GDB */
+	  if (lm_prev == 0)
+	    {
+	      sprintf (p, " main-lm=\"0x%lx\"", (unsigned long) lm_addr);
+	      p = p + strlen (p);
+	    }
+	  else if (libname[0] != '\0')
 	    {
 	      /* 6x the size for xml_escape_text below.  */
 	      size_t len = 6 * strlen ((char *) libname);
@@ -5770,11 +5776,6 @@ linux_qxfer_libraries_svr4 (const char *annex, unsigned char *readbuf,
 			    name, (unsigned long) lm_addr,
 			    (unsigned long) l_addr, (unsigned long) l_ld);
 	      free (name);
-	    }
-	  else if (lm_prev == 0)
-	    {
-	      sprintf (p, " main-lm=\"0x%lx\"", (unsigned long) lm_addr);
-	      p = p + strlen (p);
 	    }
 
 	  if (l_next == 0)

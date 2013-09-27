@@ -45,6 +45,12 @@
 #define ARC_MACH_ARCV2   32
 #define ARC_MACH_ARCV2HS 64
 
+#define ARC_NPS_CMDS
+
+#ifdef ARC_NPS_CMDS
+#define VALID_MSB_CCM1    0x57f00000
+#define ARC_NO_SIMD_CMDS
+#endif
 /* Additional cpu values can be inserted here and ARC_MACH_BIG moved down.  */
 #define ARC_MACH_BIG 128
 
