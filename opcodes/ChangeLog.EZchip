@@ -1,3 +1,7 @@
+2014-1-19  Roy Vardi  <royv@ezchip.com>
+
+* arccompact-dis.c (dsmOneArcInst): Updated decoding_class 75 to support sd and xd address types for atomic operations
+
 2013-11-30  Roy Vardi  <royv@ezchip.com>
   
 * arcompact-dis.c: EZchip NPS additions and changes
