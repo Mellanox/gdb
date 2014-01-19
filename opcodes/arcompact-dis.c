@@ -6616,6 +6616,8 @@ dsmOneArcInst (bfd_vma addr, struct arcDisState *state, disassemble_info * info)
 	          	  default: break;
 	          	  }
                           break;
+	          case 3: strcpy(strType,"sd:"); break;
+	          case 4: strcpy(strType,"xd:"); break;
 	          case 5:
 	        	  strcpy(strType,"cd:");
 	        	  switch (subOpcode) {
@@ -6733,7 +6735,7 @@ dsmOneArcInst (bfd_vma addr, struct arcDisState *state, disassemble_info * info)
                     	  }
                 	  }
                 	  else {
-                		  if ((subOpcode == 16) && ((type == 0) || (type == 1))) {
+                		  if ((subOpcode == 16) && ((type == 0) || (type == 1) || (type == 3) || (type == 4))) {
                 			  if (type == 0)
                 				  strcat(formatString,"[cm:GPA2],[%s%r]");
                 			  else
