@@ -2437,16 +2437,16 @@ dsmOneArcInst (bfd_vma addr, struct arcDisState *state, disassemble_info * info)
       case 0x22: instrName = "utf8"; decodingClass = 0; break;
       case 0x23: instrName = "addf"; decodingClass = 0; break;
       case 0x25: instrName = "dcacl"; decodingClass = 0; break;
-      case 0x26: instrName = "idxalc"; decodingClass = 65; break;
-      case 0x27: instrName = "sidxfre"; decodingClass = 65; break;
-      case 0x28: instrName = "idxfre"; decodingClass = 65; break;
+      case 0x1C: instrName = "idxalc"; decodingClass = 65; break;
+      case 0x1D: instrName = "sidxfre"; decodingClass = 65; break;
+      case 0x1E: instrName = "idxfre"; decodingClass = 65; break;
       case 0x29: instrName = "dcip"; decodingClass = 82; break;
       case 0x2A: instrName = "csma"; decodingClass = 0; break;
-      case 0x2B: instrName = "jobalc"; decodingClass = 65; break;
+      case 0x1F: instrName = "jobalc"; decodingClass = 65; break;
       case 0x2C: instrName = "csms"; decodingClass = 0; break;
       case 0x2D: instrName = "cbba"; decodingClass = 0; break;
       case 0x2E: instrName = "rflt"; decodingClass = 0; break;
-      case 0x30:
+      case 0x1B:
     	  decodingClass = 26;
     	  switch ( BITS(state->words[0],6,11) ) {
     	  	  case 0: instrName = "wkup"; decodingClass = 69; break;
@@ -2454,8 +2454,8 @@ dsmOneArcInst (bfd_vma addr, struct arcDisState *state, disassemble_info * info)
     	  	  default: instrName = "wkup.???"; break;
     	  }
     	  break;
-      case 0x31: instrName = "lkpitcm"; decodingClass = 84; break;
-      case 0x32: instrName = "lkpetcm"; decodingClass = 84; break;
+      case 0xE: instrName = "lkpitcm"; decodingClass = 84; break;
+      case 0xF: instrName = "lkpetcm"; decodingClass = 84; break;
       case 0x33: instrName = "crc16"; decodingClass = 0; break;
       case 0x34: instrName = "crc32"; decodingClass = 0; break;
       case 0x35: instrName = "zncv"; decodingClass = 0; break;
@@ -5634,7 +5634,7 @@ dsmOneArcInst (bfd_vma addr, struct arcDisState *state, disassemble_info * info)
     	        if ( num6 == 0 ) num6 = 64;
     	        if ( ( subopcode == 0x26 ) && ( c == 0 ) ) instrName = "sidxalc";
     	        if ( ( subopcode == 0x10 ) && ( num3 == 1 ) ) instrName = "sbdalc";
-    	        if ( ( subopcode == 0x2B ) && ( c == 0 ) ) instrName = "sjobalc";
+    	        if ( ( subopcode == 0x1F ) && ( c == 0 ) ) instrName = "sjobalc";
     	        write_instr_name();
     	        WRITE_FORMAT_x(A);
 //    	        WRITE_FORMAT_COMMA_x(B);
@@ -6372,7 +6372,7 @@ dsmOneArcInst (bfd_vma addr, struct arcDisState *state, disassemble_info * info)
 	      CHECK_FIELD_B();
 	      CHECK_FIELD_A();
 	      subopcode = BITS(state->words[0],16,21);
-	      if (subopcode == 0x30)
+	      if (subopcode == 0x1B)
 	    	  instrName = "wkup";
 	      else
 	      {
@@ -7658,7 +7658,7 @@ dsmOneArcInst (bfd_vma addr, struct arcDisState *state, disassemble_info * info)
 
     	   	  sid = (limm_value & 0x7f00) >> 8;
     	   	  keysize = (limm_value & 0x7f) >> 0;
-    	   	  if (BITS(state->words[0],16,21) == 0x31){//lkpitcm
+    	   	  if (BITS(state->words[0],16,21) == 0xE){//lkpitcm
     	   		  ops = (limm_value & 0x1ff8000) >> 19;
     	   		  strcat(formatString,",[cm:%r],[cm:%r],%d,%d,%d");
     	   		  my_sprintf(state, state->operandBuffer, formatString, fieldA, fieldB, fieldB, sid, ops, keysize);
