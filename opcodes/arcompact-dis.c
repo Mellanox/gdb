@@ -5881,24 +5881,72 @@ dsmOneArcInst (bfd_vma addr, struct arcDisState *state, disassemble_info * info)
      	    	    		my_sprintf(state, state->operandBuffer, formatString, fieldA, srcStr, fieldB, fieldC);
      	    	    		break;
 	    	    	    case 02:
-         	    	    	strcat(formatString,",[%s%r,%r],%r");
-         	    	    	my_sprintf(state, state->operandBuffer, formatString, fieldA, srcStr, fieldB, fieldC, fieldC);
+	    	    	    	if ((limm_value & 0x00800000) >> 23) {
+	    	    	    		strcat(formatString,",[%s%r,%r],%r");
+	    	    	    		my_sprintf(state, state->operandBuffer, formatString, fieldA, srcStr, fieldB, fieldC, fieldC);
+	    	    	    	}
+	    	    	    	else {
+	    	    	    		strcat(formatString,",[%s%r,%r,%r],%r");
+	    	    	    		my_sprintf(state, state->operandBuffer, formatString, fieldA, srcStr, fieldB, fieldC, fieldC, fieldC);
+	    	    	    	}
         	    	    	break;
     	    	    	    case 11:
-    	    	    		strcat(formatString,",[%s%r],[%s%r],%r");
-    	    	    		my_sprintf(state, state->operandBuffer, formatString, fieldA, dstStr, fieldB, srcStr, fieldB, fieldC);
+    	    	    	    if ((limm_value & 0x00400000) >> 22) {
+    	    	    	    	strcat(formatString,",[%s%r],[%s%r],%r");
+    	    	    	    	my_sprintf(state, state->operandBuffer, formatString, fieldA, dstStr, fieldB, srcStr, fieldB, fieldC);
+    	    	    	    }
+    	    	    	    else {
+    	    	    	    	if ((subOpc1 == 3) && (subOpc2 == 7)) {
+    	    	    	    		strcat(formatString,",[%s%r,%r],[%s%r],%r");
+    	    	    	    		my_sprintf(state, state->operandBuffer, formatString, fieldA, dstStr, fieldB, fieldC, srcStr, fieldB, fieldC);
+    	    	    	    	}
+    	    	    	    	else {
+    	    	    	    		strcat(formatString,",[%s%r],[%s%r,%r],%r");
+    	    	    	    		my_sprintf(state, state->operandBuffer, formatString, fieldA, dstStr, fieldB, srcStr, fieldB, fieldC, fieldC);
+    	    	    	    	}
+    	    	    	    }
     	    	    		break;
         	    	    case 12:
-         	    	    	strcat(formatString,",[%s%r],[%s%r,%r],%r");
-         	    	    	my_sprintf(state, state->operandBuffer, formatString, fieldA, dstStr, fieldB, srcStr, fieldB, fieldC, fieldC);
+        	    	    	if ((limm_value & 0x00800000) >> 23) {
+        	    	    		strcat(formatString,",[%s%r],[%s%r,%r],%r");
+        	    	    		my_sprintf(state, state->operandBuffer, formatString, fieldA, dstStr, fieldB, srcStr, fieldB, fieldC, fieldC);
+        	    	    	}
+        	    	    	else {
+        	    	    		if ((subOpc1 == 1) && (subOpc2 == 4)) {
+        	    	    			strcat(formatString,",[%s%r],[%s%r,%r,%r],%r");
+        	    	    			my_sprintf(state, state->operandBuffer, formatString, fieldA, dstStr, fieldB, srcStr, fieldB, fieldC, fieldC, fieldC);
+        	    	    		}
+        	    	    		else {
+        	    	    			strcat(formatString,",[%s%r,%r],[%s%r,%r,%r],%r");
+        	    	    			my_sprintf(state, state->operandBuffer, formatString, fieldA, dstStr, fieldB, fieldC, srcStr, fieldB, fieldC, fieldC, fieldC);
+        	    	    		}
+        	    	    	}
         	    	    	break;
         	    	    case 21:
-         	    	    	strcat(formatString,",[%s%r,%r],[%s%r],%r");
-        	    	    	my_sprintf(state, state->operandBuffer, formatString, fieldA, dstStr, fieldB, fieldC, srcStr, fieldB, fieldC);
+        	    	    	if ((limm_value & 0x00800000) >> 23) {
+        	    	    		strcat(formatString,",[%s%r,%r],[%s%r],%r");
+        	    	    		my_sprintf(state, state->operandBuffer, formatString, fieldA, dstStr, fieldB, fieldC, srcStr, fieldB, fieldC);
+        	    	    	}
+        	    	    	else {
+        	    	    		if ((subOpc1 == 1) && (subOpc2 == 6)) {
+        	    	    			strcat(formatString,",[%s%r,%r,%r],[%s%r],%r");
+        	    	    			my_sprintf(state, state->operandBuffer, formatString, fieldA, dstStr, fieldB, fieldC, fieldC, srcStr, fieldB, fieldC);
+        	    	    		}
+        	    	    		else {
+        	    	    			strcat(formatString,",[%s%r,%r,%r],[%s%r,%r],%r");
+        	    	    			my_sprintf(state, state->operandBuffer, formatString, fieldA, dstStr, fieldB, fieldC, fieldC, srcStr, fieldB, fieldC, fieldC);
+        	    	    		}
+        	    	    	}
         	    	    	break;
         	    	    case 22:
-         	    	    	strcat(formatString,",[%s%r,%r],[%s%r,%r],%r");
-        	    	    	my_sprintf(state, state->operandBuffer, formatString, fieldA, dstStr, fieldB, fieldC, srcStr, fieldB, fieldC, fieldC);
+        	    	    	if ((limm_value & 0x00800000) >> 23) {
+        	    	    		strcat(formatString,",[%s%r,%r],[%s%r,%r],%r");
+        	    	    		my_sprintf(state, state->operandBuffer, formatString, fieldA, dstStr, fieldB, fieldC, srcStr, fieldB, fieldC, fieldC);
+        	    	    	}
+        	    	    	else {
+        	    	    		strcat(formatString,",[%s%r,%r,%r],[%s%r,%r,%r],%r");
+        	    	    		my_sprintf(state, state->operandBuffer, formatString, fieldA, dstStr, fieldB, fieldC, fieldC, srcStr, fieldB, fieldC, fieldC, fieldC);
+        	    	    	}
         	    	    	break;
         	    	}
         	    	break;
@@ -5915,13 +5963,25 @@ dsmOneArcInst (bfd_vma addr, struct arcDisState *state, disassemble_info * info)
         	    	    	break;
 			     case 11:
 				if (c) {
-					strcat(formatString,",[%s%r],[%s0x%04x],%r");
-					my_sprintf(state, state->operandBuffer, formatString, fieldA, dstStr, fieldB, srcStr, ccm, fieldC);
+					if ((limm_value & 0x00400000) >> 22) {
+						strcat(formatString,",[%s%r],[%s0x%04x],%r");
+						my_sprintf(state, state->operandBuffer, formatString, fieldA, dstStr, fieldB, srcStr, ccm, fieldC);
+					}
+					else {
+						strcat(formatString,",[%s%r],[%s0x%04x,%r],%r");
+						my_sprintf(state, state->operandBuffer, formatString, fieldA, dstStr, fieldB, srcStr, ccm, fieldC, fieldC);
+					}
 				}
 				else {
 					if ((subOpc2 == 5) || (subOpc2 == 7)){
-						strcat(formatString,",[%s%r],[%s0x%04x],%r");
-						my_sprintf(state, state->operandBuffer, formatString, fieldA, dstStr, fieldB, srcStr, ccm, fieldC);
+						if ((limm_value & 0x00400000) >> 22) {
+							strcat(formatString,",[%s%r],[%s0x%04x],%r");
+							my_sprintf(state, state->operandBuffer, formatString, fieldA, dstStr, fieldB, srcStr, ccm, fieldC);
+						}
+						else {
+							strcat(formatString,",[%s%r],[%s0x%04x,%r],%r");
+							my_sprintf(state, state->operandBuffer, formatString, fieldA, dstStr, fieldB, srcStr, ccm, fieldC, fieldC);
+						}
 					}
 					else {
 						strcat(formatString,",[%s%r],[%s%r],%r");
@@ -5959,7 +6019,7 @@ dsmOneArcInst (bfd_vma addr, struct arcDisState *state, disassemble_info * info)
         	    	    	my_sprintf(state, state->operandBuffer, formatString, fieldA, dstStr, ccm, fieldC, srcStr, fieldB, fieldC);
         	    	    	break;
         	    	    case 22:
-         	    	    	strcat(formatString,",[%s0x%04x,%r],[%s%r,%r],%r");
+        	    	    	strcat(formatString,",[%s0x%04x,%r],[%s%r,%r],%r");
         	    	    	my_sprintf(state, state->operandBuffer, formatString, fieldA, dstStr, ccm, fieldC, srcStr, fieldB, fieldC, fieldC);
         	    	    	break;
         	    	}
@@ -6035,8 +6095,14 @@ dsmOneArcInst (bfd_vma addr, struct arcDisState *state, disassemble_info * info)
 				my_sprintf(state, state->operandBuffer, formatString, fieldA, srcStr, ccm, imm, fieldC);
 				break;
 			    case 11:
-				strcat(formatString,",[%s%r],[%s0x%04x],%r");
-				my_sprintf(state, state->operandBuffer, formatString, fieldA, dstStr, fieldB, srcStr, ccm, fieldC);
+			    if ((limm_value & 0x00400000) >> 22) {
+			    	strcat(formatString,",[%s%r],[%s0x%04x],%r");
+			    	my_sprintf(state, state->operandBuffer, formatString, fieldA, dstStr, fieldB, srcStr, ccm, fieldC);
+			    }
+			    else {
+			    	strcat(formatString,",[%s%r],[%s0x%04x,%r],%r");
+			    	my_sprintf(state, state->operandBuffer, formatString, fieldA, dstStr, fieldB, srcStr, ccm, fieldC, fieldC);
+			    }
 				break;
 			    case 12:
 				strcat(formatString,",[%s%r],[%s0x%04x,%d],%r");
@@ -6075,20 +6141,56 @@ dsmOneArcInst (bfd_vma addr, struct arcDisState *state, disassemble_info * info)
         	    case  9:
         	    	switch(numDp) {
         	    	    case 11:
-         	    	    	strcat(formatString,",[%s%r],[%s%r],0x%04x");
-        	    	    	my_sprintf(state, state->operandBuffer, formatString, fieldA, dstStr, fieldB, srcStr, fieldB, ccm);
+        	    	    	if ((limm_value & 0x00400000) >> 22) {
+        	    	    		strcat(formatString,",[%s%r],[%s%r],0x%04x");
+        	    	    		my_sprintf(state, state->operandBuffer, formatString, fieldA, dstStr, fieldB, srcStr, fieldB, ccm);
+        	    	    	}
+        	    	    	else {
+        	    	    		if ((subOpc1 == 3) && (subOpc2 ==7)) {
+        	    	    			strcat(formatString,",[%s%r,%r],[%s%r],0x%04x");
+        	    	    			my_sprintf(state, state->operandBuffer, formatString, fieldA, dstStr, fieldB, fieldC, srcStr, fieldB, ccm);
+        	    	    		}
+        	    	    		else {
+        	    	    			strcat(formatString,",[%s%r],[%s%r,%r],0x%04x");
+        	    	    			my_sprintf(state, state->operandBuffer, formatString, fieldA, dstStr, fieldB, srcStr, fieldB, fieldC, ccm);
+        	    	    		}
+        	    	    	}
         	    	    	break;
         	    	    case 12:
-         	    	    	strcat(formatString,",[%s%r],[%s%r,%d],%r");
-        	    	    	my_sprintf(state, state->operandBuffer, formatString, fieldA, dstStr, fieldB, srcStr, fieldB, bdOff, fieldC);
+        	    	    	if ((limm_value & 0x00800000) >> 23) {
+        	    	    		strcat(formatString,",[%s%r],[%s%r,%d],%r");
+        	    	    		my_sprintf(state, state->operandBuffer, formatString, fieldA, dstStr, fieldB, srcStr, fieldB, bdOff, fieldC);
+        	    	    	}
+        	    	    	else {
+        	    	    		strcat(formatString,",[%s%r],[%s%r,%d,%r],%r");
+        	    	    		my_sprintf(state, state->operandBuffer, formatString, fieldA, dstStr, fieldB, srcStr, fieldB, bdOff, fieldC, fieldC);
+        	    	    	}
         	    	    	break;
         	    	    case 21:
-         	    	    	strcat(formatString,",[%s%r,%d],[%s%r],%r");
-        	    	    	my_sprintf(state, state->operandBuffer, formatString, fieldA, dstStr, fieldB, bdOff, srcStr, fieldB, fieldC);
+        	    	    	if ((limm_value & 0x00800000) >> 23) {
+        	    	    		strcat(formatString,",[%s%r,%d],[%s%r],%r");
+        	    	    		my_sprintf(state, state->operandBuffer, formatString, fieldA, dstStr, fieldB, bdOff, srcStr, fieldB, fieldC);
+        	    	    	}
+        	    	    	else {
+        	    	    		if (((subOpc1 == 1) && (subOpc2 == 4)) || ((subOpc1 == 1) && (subOpc2 == 1)) || ((subOpc1 == 2) && (subOpc2 == 1))){
+        	    	    			strcat(formatString,",[%s%r,%d,%r],[%s%r,%r],%r");
+        	    	    			my_sprintf(state, state->operandBuffer, formatString, fieldA, dstStr, fieldB, bdOff, fieldC, srcStr, fieldB, fieldC, fieldC);
+        	    	    		}
+        	    	    		else {
+        	    	    			strcat(formatString,",[%s%r,%d,%r],[%s%r],%r");
+        	    	    			my_sprintf(state, state->operandBuffer, formatString, fieldA, dstStr, fieldB, bdOff, fieldC, srcStr, fieldB, fieldC);
+        	    	    		}
+        	    	    	}
         	    	    	break;
         	    	    case 22:
-         	    	    	strcat(formatString,",[%s%r,%d],[%s%r,%r],%r");
-        	    	    	my_sprintf(state, state->operandBuffer, formatString, fieldA, dstStr, fieldB, bdOff, srcStr, fieldB, fieldC, fieldC);
+        	    	    	if ((limm_value & 0x00800000) >> 23) {
+        	    	    		strcat(formatString,",[%s%r,%d],[%s%r,%r],%r");
+        	    	    		my_sprintf(state, state->operandBuffer, formatString, fieldA, dstStr, fieldB, bdOff, srcStr, fieldB, fieldC, fieldC);
+        	    	    	}
+        	    	    	else {
+        	    	    		strcat(formatString,",[%s%r,%d,%r],[%s%r,%r,%r],%r");
+        	    	    		my_sprintf(state, state->operandBuffer, formatString, fieldA, dstStr, fieldB, bdOff, fieldC, srcStr, fieldB, fieldC, fieldC, fieldC);
+        	    	    	}
         	    	    	break;
         	    	}
         	    	break;
@@ -6099,16 +6201,40 @@ dsmOneArcInst (bfd_vma addr, struct arcDisState *state, disassemble_info * info)
         	    	    	my_sprintf(state, state->operandBuffer, formatString, fieldA, dstStr, srcStr, typeAll, numDp);
         	    	    	break;
         	    	    case 12:
-         	    	    	strcat(formatString,",[%s%r],[%s%r,%d],%d");
-        	    	    	my_sprintf(state, state->operandBuffer, formatString, fieldA, dstStr, fieldB, srcStr, fieldB, bdOff, size10);
+        	    	    	if ((limm_value & 0x00800000) >> 23) {
+        	    	    		strcat(formatString,",[%s%r],[%s%r,%d],%d");
+        	    	    		my_sprintf(state, state->operandBuffer, formatString, fieldA, dstStr, fieldB, srcStr, fieldB, bdOff, size10);
+        	    	    	}
+        	    	    	else {
+        	    	    		strcat(formatString,",[%s%r],[%s%r,%d,%r],%d");
+        	    	    		my_sprintf(state, state->operandBuffer, formatString, fieldA, dstStr, fieldB, srcStr, fieldB, bdOff, fieldC, size10);
+        	    	    	}
         	    	    	break;
         	    	    case 21:
-         	    	    	strcat(formatString,",[%s%r,%d],[%s%r],%d");
-        	    	    	my_sprintf(state, state->operandBuffer, formatString, fieldA, dstStr, fieldB, bdOff, srcStr, fieldB, size10);
+        	    	    	if ((limm_value & 0x00800000) >> 23) {
+        	    	    		strcat(formatString,",[%s%r,%d],[%s%r],%d");
+        	    	    		my_sprintf(state, state->operandBuffer, formatString, fieldA, dstStr, fieldB, bdOff, srcStr, fieldB, size10);
+        	    	    	}
+        	    	    	else {
+        	    	    		if (((subOpc1 == 1) && (subOpc2 == 4)) || ((subOpc1 == 1) && (subOpc2 == 1)) || ((subOpc1 == 2) && (subOpc2 == 1))){
+        	    	    			strcat(formatString,",[%s%r,%d,%r],[%s%r,%r],%d");
+        	    	    			my_sprintf(state, state->operandBuffer, formatString, fieldA, dstStr, fieldB, bdOff, fieldC, srcStr, fieldB, fieldC, size10);
+        	    	    		}
+        	    	    		else {
+        	    	    			strcat(formatString,",[%s%r,%d,%r],[%s%r],%d");
+        	    	    			my_sprintf(state, state->operandBuffer, formatString, fieldA, dstStr, fieldB, bdOff, fieldC, srcStr, fieldB, size10);
+        	    	    		}
+        	    	    	}
         	    	    	break;
         	    	    case 22:
-         	    	    	strcat(formatString,",[%s%r,%d],[%s%r,%r],%d");
-        	    	    	my_sprintf(state, state->operandBuffer, formatString, fieldA, dstStr, fieldB, bdOff, srcStr, fieldB, fieldC, size10);
+        	    	    	if ((limm_value & 0x00800000) >> 23) {
+        	    	    		strcat(formatString,",[%s%r,%d],[%s%r,%r],%d");
+        	    	    		my_sprintf(state, state->operandBuffer, formatString, fieldA, dstStr, fieldB, bdOff, srcStr, fieldB, fieldC, size10);
+        	    	    	}
+        	    	    	else {
+        	    	    		strcat(formatString,",[%s%r,%d,%r],[%s%r,%r,%r],%d");
+        	    	    		my_sprintf(state, state->operandBuffer, formatString, fieldA, dstStr, fieldB, bdOff, fieldC, srcStr, fieldB, fieldC, fieldC, size10);
+        	    	    	}
         	    	    	break;
         	    	}
         	    	break;
@@ -6121,8 +6247,14 @@ dsmOneArcInst (bfd_vma addr, struct arcDisState *state, disassemble_info * info)
             	    	   	my_sprintf(state, state->operandBuffer, formatString, fieldA, dstStr, srcStr, typeAll, numDp);
             	    	   	break;
             	    	case 22:
-             	    	   	strcat(formatString,",[%s%r,%d],[%s%r,%d],%r");
-            	    	   	my_sprintf(state, state->operandBuffer, formatString, fieldA, dstStr, fieldB, bdOff, srcStr, fieldB, bdOff, fieldC);
+            	    		if ((limm_value & 0x00800000) >> 23) {
+            	    			strcat(formatString,",[%s%r,%d],[%s%r,%d],%r");
+            	    			my_sprintf(state, state->operandBuffer, formatString, fieldA, dstStr, fieldB, bdOff, srcStr, fieldB, bdOff, fieldC);
+            	    		}
+            	    		else {
+            	    			strcat(formatString,",[%s%r,%d,%r],[%s%r,%d,%r],%r");
+            	    			my_sprintf(state, state->operandBuffer, formatString, fieldA, dstStr, fieldB, bdOff, fieldC, srcStr, fieldB, bdOff, fieldC, fieldC);
+            	    		}
             	    	   	break;
             	    }
             	    break;
@@ -6135,8 +6267,14 @@ dsmOneArcInst (bfd_vma addr, struct arcDisState *state, disassemble_info * info)
             	        	my_sprintf(state, state->operandBuffer, formatString, fieldA, dstStr, srcStr, typeAll, numDp);
             	        	break;
            	    	    case 22:
-           	    	    	strcat(formatString,",[%s%r,%d],[%s%r,%d],%d");
-           	    	    	my_sprintf(state, state->operandBuffer, formatString, fieldA, dstStr, fieldB, bdOff, srcStr, fieldB, bdOff, size10);
+           	    	    	if ((limm_value & 0x00800000) >> 23) {
+           	    	    		strcat(formatString,",[%s%r,%d],[%s%r,%d],%d");
+           	    	    		my_sprintf(state, state->operandBuffer, formatString, fieldA, dstStr, fieldB, bdOff, srcStr, fieldB, bdOff, size10);
+           	    	    	}
+           	    	    	else {
+           	    	    		strcat(formatString,",[%s%r,%d,%r],[%s%r,%d,%r],%d");
+           	    	    		my_sprintf(state, state->operandBuffer, formatString, fieldA, dstStr, fieldB, bdOff, fieldC, srcStr, fieldB, bdOff, fieldC, size10);
+           	    	    	}
            	    	    	break;
            	    	}
            	    	break;
@@ -6144,18 +6282,48 @@ dsmOneArcInst (bfd_vma addr, struct arcDisState *state, disassemble_info * info)
         	    case 14:
         	    	switch(numDp) {
 		            case 01:
-				strcat(formatString,",[%s%r],%d");
-				my_sprintf(state, state->operandBuffer, formatString, fieldA, srcStr, fieldB, size10);
+		            	if ((subOpc1 == 3) && (subOpc2 == 1)) {
+		            		if ((limm_value & 0x00400000) >> 22) {
+		            			strcat(formatString,",[%s%d],%r");
+		            			my_sprintf(state, state->operandBuffer, formatString, fieldA, srcStr, size10, fieldB);
+		            		}
+		            		else {
+		            			strcat(formatString,",[%s%d,%r],%r");
+		            			my_sprintf(state, state->operandBuffer, formatString, fieldA, srcStr, size10, fieldC, fieldB);
+		            		}
+		            	}
+		            	else {
+		            		strcat(formatString,",[%s%r],%d");
+		            		my_sprintf(state, state->operandBuffer, formatString, fieldA, srcStr, fieldB, size10);
+		            	}
 				break;
         	    	    case 02:
-         	    	    	strcat(formatString,",[%s%r,%r],%d");
-         	    	    	my_sprintf(state, state->operandBuffer, formatString, fieldA, srcStr, fieldB, fieldC, size10);
+        	    	    	if ((limm_value & 0x00800000) >> 23) {
+        	    	    		strcat(formatString,",[%s%r,%r],%d");
+        	    	    		my_sprintf(state, state->operandBuffer, formatString, fieldA, srcStr, fieldB, fieldC, size10);
+        	    	    	}
+        	    	    	else {
+        	    	    		strcat(formatString,",[%s%r,%r,%r],%d");
+        	    	    		my_sprintf(state, state->operandBuffer, formatString, fieldA, srcStr, fieldB, fieldC, fieldC, size10);
+        	    	    	}
         	    	    	break;
 			    case 11:
 				if (!c) {
 					if (subOpc1 == 3) {
-						strcat(formatString,",[%s%r],[%s0x%04x],%r");
-						my_sprintf(state, state->operandBuffer, formatString, fieldA, dstStr, fieldB, srcStr, ccm, fieldC);
+						if ((limm_value & 0x00400000) >> 22) {
+							strcat(formatString,",[%s%r],[%s0x%04x],%r");
+							my_sprintf(state, state->operandBuffer, formatString, fieldA, dstStr, fieldB, srcStr, ccm, fieldC);
+						}
+						else {
+							if ((subOpc2 == 7)) {
+								strcat(formatString,",[%s%r,%r],[%s0x%04x],%r");
+								my_sprintf(state, state->operandBuffer, formatString, fieldA, dstStr, fieldB, fieldC, srcStr, ccm, fieldC);
+							}
+							else {
+								strcat(formatString,",[%s%r],[%s0x%04x,%r],%r");
+								my_sprintf(state, state->operandBuffer, formatString, fieldA, dstStr, fieldB, srcStr, ccm, fieldC, fieldC);
+							}
+						}
 					}
 					else {
 						strcat(formatString,",[%s%r],[%s%r],%d");
@@ -6163,21 +6331,63 @@ dsmOneArcInst (bfd_vma addr, struct arcDisState *state, disassemble_info * info)
 					}
 				}
 				else {
-					strcat(formatString,",[%s0x%04x],[%s%r],%r");
-					my_sprintf(state, state->operandBuffer, formatString, fieldA, dstStr, ccm, srcStr, fieldB, fieldC);
+					if ((limm_value & 0x00400000) >> 22) {
+						strcat(formatString,",[%s0x%04x],[%s%r],%r");
+						my_sprintf(state, state->operandBuffer, formatString, fieldA, dstStr, ccm, srcStr, fieldB, fieldC);
+					}
+					else {
+						if ((subOpc1 == 3) && (subOpc2 == 7)) {
+							strcat(formatString,",[%s0x%04x,%r],[%s%r],%r");
+							my_sprintf(state, state->operandBuffer, formatString, fieldA, dstStr, ccm, fieldC, srcStr, fieldB, fieldC);
+						}
+						else {
+							strcat(formatString,",[%s0x%04x],[%s%r,%r],%r");
+							my_sprintf(state, state->operandBuffer, formatString, fieldA, dstStr, ccm, srcStr, fieldB, fieldC, fieldC);
+						}
+					}
 				}
 				break;
         	    	    case 12:
-         	    	    	strcat(formatString,",[%s%r],[%s%r,%r],%d");
-         	    	    	my_sprintf(state, state->operandBuffer, formatString, fieldA, dstStr, fieldB, srcStr, fieldB, fieldC, size10);
+        	    	    	if ((limm_value & 0x00800000) >> 23) {
+        	    	    		strcat(formatString,",[%s%r],[%s%r,%r],%d");
+        	    	    		my_sprintf(state, state->operandBuffer, formatString, fieldA, dstStr, fieldB, srcStr, fieldB, fieldC, size10);
+        	    	    	}
+        	    	    	else {
+        	    	    		if (((subOpc1 == 1) && (subOpc2 == 6)) || ((subOpc1 == 1) && (subOpc2 == 2)) || ((subOpc1 == 2) && (subOpc2 == 2))) {
+        	    	    			strcat(formatString,",[%s%r,%r],[%s%r,%r,%r],%d");
+        	    	    			my_sprintf(state, state->operandBuffer, formatString, fieldA, dstStr, fieldB, fieldC, srcStr, fieldB, fieldC, fieldC, size10);
+        	    	    		}
+        	    	    		else {
+        	    	    			strcat(formatString,",[%s%r],[%s%r,%r,%r],%d");
+        	    	    			my_sprintf(state, state->operandBuffer, formatString, fieldA, dstStr, fieldB, srcStr, fieldB, fieldC, fieldC, size10);
+        	    	    		}
+        	    	    	}
         	    	    	break;
         	    	    case 21:
-         	    	    	strcat(formatString,",[%s%r,%r],[%s%r],%d");
-        	    	    	my_sprintf(state, state->operandBuffer, formatString, fieldA, dstStr, fieldB, fieldC, srcStr, fieldB, size10);
+        	    	    	if ((limm_value & 0x00800000) >> 23) {
+        	    	    		strcat(formatString,",[%s%r,%r],[%s%r],%d");
+        	    	    		my_sprintf(state, state->operandBuffer, formatString, fieldA, dstStr, fieldB, fieldC, srcStr, fieldB, size10);
+        	    	    	}
+        	    	    	else {
+        	    	    		if (((subOpc1 == 1) && (subOpc2 == 6)) || ((subOpc1 == 2) && (subOpc2 == 6))){
+        	    	    			strcat(formatString,",[%s%r,%r,%r],[%s%r],%d");
+        	    	    			my_sprintf(state, state->operandBuffer, formatString, fieldA, dstStr, fieldB, fieldC, fieldC, srcStr, fieldB, size10);
+        	    	    		}
+        	    	    		else {
+        	    	    			strcat(formatString,",[%s%r,%r,%r],[%s%r,%r],%d");
+        	    	    			my_sprintf(state, state->operandBuffer, formatString, fieldA, dstStr, fieldB, fieldC, fieldC, srcStr, fieldB, fieldC, size10);
+        	    	    		}
+        	    	    	}
         	    	    	break;
         	    	    case 22:
-         	    	    	strcat(formatString,",[%s%r,%r],[%s%r,%r],%d");
-        	    	    	my_sprintf(state, state->operandBuffer, formatString, fieldA, dstStr, fieldB, fieldC, srcStr, fieldB, fieldC, size10);
+        	    	    	if ((limm_value & 0x00800000) >> 23) {
+        	    	    		strcat(formatString,",[%s%r,%r],[%s%r,%r],%d");
+        	    	    		my_sprintf(state, state->operandBuffer, formatString, fieldA, dstStr, fieldB, fieldC, srcStr, fieldB, fieldC, size10);
+        	    	    	}
+        	    	    	else {
+        	    	    		strcat(formatString,",[%s%r,%r,%r],[%s%r,%r,%r],%d");
+        	    	    		my_sprintf(state, state->operandBuffer, formatString, fieldA, dstStr, fieldB, fieldC, fieldC, srcStr, fieldB, fieldC, fieldC, size10);
+        	    	    	}
         	    	    	break;
         	    	}
         	    	break;
@@ -7227,7 +7437,6 @@ dsmOneArcInst (bfd_vma addr, struct arcDisState *state, disassemble_info * info)
           		  dstStr = "cm:";
           		  srcStr = "cm:";
           		  off_sel = 0;
-          		  entry_sel = 0;
           		  break;
 
           }
@@ -7259,23 +7468,63 @@ dsmOneArcInst (bfd_vma addr, struct arcDisState *state, disassemble_info * info)
  	          else { // mode = 0 && numSp = 1
  	        	  if ( ps == 0 ) { // mode = 0 && numSp = 1 && ps = 0
  	        		  if ( off_sel == 0 ) { // mode = 0 && numSp = 1 && ps = 0 && off_sel = 0
- 	        			  strcat(formatString,"%r,[%s%r],[%s%r]");
- 	        			  my_sprintf(state, state->operandBuffer, formatString, fieldB, dstStr, fieldC, srcStr, fieldB);
+ 	        			 if ( entry_sel == 1 ) {
+ 	        				 strcat(formatString,"%r,[%s%r],[%s%r]");
+ 	        				 my_sprintf(state, state->operandBuffer, formatString, fieldB, dstStr, fieldC, srcStr, fieldB);
+ 	        			 }
+ 	        			 else {
+ 	        				 if (type != 10) {
+ 	        					 strcat(formatString,"%r,[%s%r],[%s%r,%r]");
+ 	        					 my_sprintf(state, state->operandBuffer, formatString, fieldB, dstStr, fieldC, srcStr, fieldB, fieldC);
+ 	        				 }
+ 	        				 else {
+ 	        					 strcat(formatString,"%r,[%s%r],[%s%r],%r");
+ 	        					 my_sprintf(state, state->operandBuffer, formatString, fieldB, dstStr, fieldC, srcStr, fieldB, fieldC);
+ 	        				 }
+ 	        			 }
  	        		  }
  	        		  else { // mode = 0 && numSp = 1 && ps = 0 && off_sel != 0
- 	        			  strcat(formatString,"%r,[%s%r],[%s%d]");
- 	        			  my_sprintf(state, state->operandBuffer, formatString, fieldB, dstStr, fieldC, srcStr, imm_off);
+ 	        			 if ( entry_sel == 1 ) {
+ 	        				 strcat(formatString,"%r,[%s%r],[%s%d]");
+ 	        				 my_sprintf(state, state->operandBuffer, formatString, fieldB, dstStr, fieldC, srcStr, imm_off);
+ 	        			 }
+ 	        			 else {
+ 	        				 strcat(formatString,"%r,[%s%r],[%s%d,%r]");
+ 	        				 my_sprintf(state, state->operandBuffer, formatString, fieldB, dstStr, fieldC, srcStr, imm_off, fieldC);
+ 	        			 }
  	        		  }
  	        	  }
  	        	  else { // mode = 0 && numSp = 1 && ps != 0
  	        		  if ( off_sel == 0 ) { // mode = 0 && numSp = 1 && ps != 0 && off_sel = 0
  	        			  if ( numDp == 1 ) { // mode = 0 && numSp = 1 && ps != 0 && off_sel = 0 && numDp = 1
- 	        				  strcat(formatString,"[%s%r],[%s%r]");
- 	        				  if ( swap_bc == 0) {
- 	        					  my_sprintf(state, state->operandBuffer, formatString, dstStr, fieldC, srcStr, fieldB);
+ 	        				  if ( entry_sel == 1 ) {
+ 	        					  strcat(formatString,"[%s%r],[%s%r]");
+ 	        					  if ( swap_bc == 0) {
+ 	        						  my_sprintf(state, state->operandBuffer, formatString, dstStr, fieldC, srcStr, fieldB);
+ 	        					  }
+ 	        					  else {
+ 	        						  my_sprintf(state, state->operandBuffer, formatString, dstStr, fieldB, srcStr, fieldC);
+ 	        					  }
  	        				  }
  	        				  else {
- 	        					  my_sprintf(state, state->operandBuffer, formatString, dstStr, fieldB, srcStr, fieldC);
+ 	        					  if (type == 2) {
+ 	        						  strcat(formatString,"[%s%r],[%s%r,%r]");
+ 	        						  if ( swap_bc == 0) {
+ 	        							  my_sprintf(state, state->operandBuffer, formatString, dstStr, fieldC, srcStr, fieldB, fieldC);
+ 	        						  }
+ 	        						  else {
+ 	        							  my_sprintf(state, state->operandBuffer, formatString, dstStr, fieldB, srcStr, fieldC, fieldC);
+ 	        						  }
+ 	        					  }
+ 	        					  else {
+ 	        						  strcat(formatString,"[%s%r,%r],[%s%r]");
+ 	        						  if ( swap_bc == 0) {
+ 	        							  my_sprintf(state, state->operandBuffer, formatString, dstStr, fieldC, fieldC, srcStr, fieldB);
+ 	        						  }
+ 	        						  else {
+ 	        							  my_sprintf(state, state->operandBuffer, formatString, dstStr, fieldB, fieldC, srcStr, fieldC);
+ 	        						  }
+ 	        					  }
  	        				  }
  	        			  }
  	        			  else { // mode = 0 && numSp = 1 && ps != 0 && off_sel = 0 && numDp = 2
@@ -7299,69 +7548,69 @@ dsmOneArcInst (bfd_vma addr, struct arcDisState *state, disassemble_info * info)
  	      else { // mode = 1
 	          if ( ps == 0 ) { // mode = 1 && ps = 0
 	        	  if ( off_sel == 0 ) { // mode = 1 && ps = 0 && off_sel = 0
-	        		  if ( entry_sel == 0 ) { // mode = 1 && ps = 0 && off_sel = 0 && entry_sel = 0
+	        		  if (entry_sel == 1) {
 	        			  strcat(formatString,"%r,[%s%r],[%s%r,%r,%r]");
 	        			  my_sprintf(state, state->operandBuffer, formatString, fieldB, dstStr, fieldC, srcStr, fieldB, fieldC, fieldC);
 	        		  }
-	        		  else { // mode = 1 && ps = 0 && off_sel = 0 && entry_sel != 0
-	        			  strcat(formatString,"%r,[%s%r],[%s%r,%d,%r]");
-	        			  my_sprintf(state, state->operandBuffer, formatString, fieldB, dstStr, fieldC, srcStr, fieldB, imm_entry, fieldC);
+	        		  else {
+	        			  strcat(formatString,"%r,[%s%r],[%s%r,%r,%r,%r]");
+	        			  my_sprintf(state, state->operandBuffer, formatString, fieldB, dstStr, fieldC, srcStr, fieldB, fieldC, fieldC, fieldC);
 	        		  }
 	        	  }
 	        	  else { // mode = 1 && ps = 0 && off_sel != 0
-	        		  if ( entry_sel == 0 ) { // mode = 1 && ps = 0 && off_sel != 0 && entry_sel = 0
-	        			  strcat(formatString,"%r,[%s%r],[%s%r,%r,%d]");
-	        			  my_sprintf(state, state->operandBuffer, formatString, fieldB, dstStr, fieldC, srcStr, fieldB, fieldC, imm_off);
-	        		  }
-	        		  else { // mode = 1 && ps = 0 && off_sel != 0 && entry_sel != 0
+	        		  if ( entry_sel != 0 ) {
 	        			  strcat(formatString,"%r,[%s%r],[%s%r,%d,%d]");
 	        			  my_sprintf(state, state->operandBuffer, formatString, fieldB, dstStr, fieldC, srcStr, fieldB, imm_entry, imm_off);
+	        		  }
+	        		  else {
+	        			  strcat(formatString,"%r,[%s%r],[%s%r,%d,%d,%r]");
+	        			  my_sprintf(state, state->operandBuffer, formatString, fieldB, dstStr, fieldC, srcStr, fieldB, imm_entry, imm_off, fieldC);
 	        		  }
 	        	  }
 	          }
 	          else { // mode = 1 && ps != 0
 	        	  if ( off_sel == 0 ) { // mode = 1 && ps != 0 && off_sel = 0
-	        		  if ( entry_sel == 0 ) { // mode = 1 && ps != 0 && off_sel = 0 && entry_sel = 0
- 	        			  if ( numDp == 1 ) { // mode = 1 && ps != 0 && off_sel = 0 && entry_sel = 0 && numDp = 1
- 	        				  strcat(formatString,"[%s%r],[%s%r,%r,%r]");
- 	        				  my_sprintf(state, state->operandBuffer, formatString, dstStr, fieldC, srcStr, fieldB, fieldC, fieldC);
- 	        			  }
- 	        			  else {  // mode = 1 && ps != 0 && off_sel = 0 && entry_sel = 0 && numDp = 2
- 	        				  strcat(formatString,"[%s%r,%r,%r],[%s%r]");
- 	        				  my_sprintf(state, state->operandBuffer, formatString, dstStr, fieldB, fieldC, fieldC, srcStr, fieldC);
- 	        			  }
+	        		  if ( numDp == 1 ) { // mode = 1 && ps != 0 && off_sel = 0 && entry_sel = 0 && numDp = 1
+	        			  if ( entry_sel == 1 ) {
+	        				  strcat(formatString,"[%s%r],[%s%r,%r,%r]");
+	        				  my_sprintf(state, state->operandBuffer, formatString, dstStr, fieldC, srcStr, fieldB, fieldC, fieldC);
+	        			  }
+	        			  else {
+	        				  strcat(formatString,"[%s%r],[%s%r,%r,%r,%r]");
+	        				  my_sprintf(state, state->operandBuffer, formatString, dstStr, fieldC, srcStr, fieldB, fieldC, fieldC, fieldC);
+	        			  }
 	        		  }
-	        		  else { // mode = 1 && ps != 0 && off_sel = 0 && entry_sel != 0
- 	        			  if ( numDp == 1 ) { // mode = 1 && ps != 0 && off_sel = 0 && entry_sel != 0 && numDp = 1
- 	        				  strcat(formatString,"[%s%r],[%s%r,%d,%r]");
- 	        				  my_sprintf(state, state->operandBuffer, formatString, dstStr, fieldC, srcStr, fieldB, imm_entry, fieldC);
- 	        			  }
- 	        			  else {  // mode = 1 && ps != 0 && off_sel = 0 && entry_sel != 0 && numDp = 2
- 	        				  strcat(formatString,"[%s%r,%d,%r],[%s%r]");
- 	        				  my_sprintf(state, state->operandBuffer, formatString, dstStr, fieldB, imm_entry, fieldC, srcStr, fieldC);
- 	        			  }
+	        		  else {  // mode = 1 && ps != 0 && off_sel = 0 && entry_sel = 0 && numDp = 2
+	        			  if ( entry_sel == 1 ) {
+	        				  strcat(formatString,"[%s%r,%r,%r],[%s%r]");
+	        				  my_sprintf(state, state->operandBuffer, formatString, dstStr, fieldB, fieldC, fieldC, srcStr, fieldC);
+	        			  }
+	        			  else {
+	        				  strcat(formatString,"[%s%r,%r,%r,%r],[%s%r]");
+	        				  my_sprintf(state, state->operandBuffer, formatString, dstStr, fieldB, fieldC, fieldC, fieldC, srcStr, fieldC);
+	        			  }
 	        		  }
 	        	  }
 	        	  else { // mode = 1 && ps != 0 && off_sel != 0
-	        		  if ( entry_sel == 0 ) { // mode = 1 && ps != 0 && off_sel != 0 && entry_sel = 0
- 	        			  if ( numDp == 1 ) { // mode = 1 && ps != 0 && off_sel != 0 && entry_sel = 0 && numDp = 1
- 	        				  strcat(formatString,"[%s%r],[%s%r,%r,%d]");
- 	        				  my_sprintf(state, state->operandBuffer, formatString, dstStr, fieldC, srcStr, fieldB, fieldC, imm_off);
- 	        			  }
- 	        			  else { // mode = 1 && ps != 0 && off_sel != 0 && entry_sel = 0 && numDp = 1
- 	        				  strcat(formatString,"[%s%r,%r,%d],[%s%r]");
- 	        				  my_sprintf(state, state->operandBuffer, formatString, dstStr, fieldB, fieldC, imm_off, srcStr, fieldC);
- 	        			  }
+	        		  if ( numDp == 1 ) { // mode = 1 && ps != 0 && off_sel != 0 && entry_sel != 0 && numDp = 1
+	        			  if ( entry_sel == 1 ) {
+	        				  strcat(formatString,"[%s%r],[%s%r,%d,%d]");
+	        				  my_sprintf(state, state->operandBuffer, formatString, dstStr, fieldC, srcStr, fieldB, imm_entry, imm_off);
+	        			  }
+	        			  else {
+	        				  strcat(formatString,"[%s%r],[%s%r,%d,%d,%r]");
+	        				  my_sprintf(state, state->operandBuffer, formatString, dstStr, fieldC, srcStr, fieldB, imm_entry, imm_off, fieldC);
+	        			  }
 	        		  }
-	        		  else { // mode = 1 && ps != 0 && off_sel != 0 && entry_sel != 0
- 	        			  if ( numDp == 1 ) { // mode = 1 && ps != 0 && off_sel != 0 && entry_sel != 0 && numDp = 1
- 	        				  strcat(formatString,"[%s%r],[%s%r,%d,%d]");
- 	        				  my_sprintf(state, state->operandBuffer, formatString, dstStr, fieldC, srcStr, fieldB, imm_entry, imm_off);
- 	        			  }
- 	        			  else {  // mode = 1 && ps != 0 && off_sel != 0 && entry_sel != 0 && numDp = 2
- 	        				  strcat(formatString,"[%s%r,%d,%d],[%s%r]");
- 	        				  my_sprintf(state, state->operandBuffer, formatString, dstStr, fieldB, imm_entry, imm_off, srcStr, fieldC);
- 	        			  }
+	        		  else {  // mode = 1 && ps != 0 && off_sel != 0 && entry_sel != 0 && numDp = 2
+	        			  if ( entry_sel == 1 ) {
+	        				  strcat(formatString,"[%s%r,%d,%d],[%s%r]");
+	        				  my_sprintf(state, state->operandBuffer, formatString, dstStr, fieldB, imm_entry, imm_off, srcStr, fieldC);
+	        			  }
+	        			  else {
+	        				  strcat(formatString,"[%s%r,%d,%d,%r],[%s%r]");
+	        				  my_sprintf(state, state->operandBuffer, formatString, dstStr, fieldB, imm_entry, imm_off, fieldC, srcStr, fieldC);
+	        			  }
 	        		  }
 	        	  }
 	          }
@@ -7679,7 +7928,7 @@ dsmOneArcInst (bfd_vma addr, struct arcDisState *state, disassemble_info * info)
     case 85:
       {
     	  int subop2;
-    	  int m, p, na, x;
+    	  int m, p, na, x, cldrs;
     	  int os, es, ss;
     	  char *dstStr;
     	  char *srcStr;
@@ -7724,6 +7973,7 @@ dsmOneArcInst (bfd_vma addr, struct arcDisState *state, disassemble_info * info)
     	  m = (limm_value & 0x10000000) >> 28;
     	  na = (limm_value & 0x01000000) >> 24;
     	  x = (limm_value & 0x00800000) >> 23;
+    	  cldrs = (limm_value & 0x00080000) >> 19;
       	  if ( m != 0 ) strcat(name,".m");
       	  if ( na != 0 ) strcat(name,".na");
       	  if ( x != 0 ) strcat(name,".x");
@@ -7738,18 +7988,30 @@ dsmOneArcInst (bfd_vma addr, struct arcDisState *state, disassemble_info * info)
       	  if (subop2 == 6 || subop2 == 7) {
           	  strcat(formatString,",[%s:%r");
           	  strcat(formatString,es ? ",%d" : ",%r");
-          	  strcat(formatString,os ? ",%d]" : ",%r]");
+          	  if (!cldrs)
+          		strcat(formatString,os ? ",%d,%r]" : ",%r,%r]");
+          	  else
+          		  strcat(formatString,os ? ",%d]" : ",%r]");
           	  strcat(formatString,",[%s:%r]");
           	  strcat(formatString,ss ? ",%d" : ",%r");
-    	  	  my_sprintf(state, state->operandBuffer, formatString, fieldA, srcStr, fieldB, entry_size_val, offset_val, dstStr, fieldB, size_val);
+          	  if (cldrs)
+          		  my_sprintf(state, state->operandBuffer, formatString, fieldA, srcStr, fieldB, entry_size_val, offset_val, dstStr, fieldB, size_val);
+          	  else
+          		  my_sprintf(state, state->operandBuffer, formatString, fieldA, srcStr, fieldB, entry_size_val, offset_val, fieldC, dstStr, fieldB, size_val);
       	  }
       	  else {
           	  strcat(formatString,",[%s:%r]");
           	  strcat(formatString,",[%s:%r");
           	  strcat(formatString,es ? ",%d" : ",%r");
-          	  strcat(formatString,os ? ",%d]" : ",%r]");
+          	  if (!cldrs)
+          		strcat(formatString,os ? ",%d,%r]" : ",%r,%r]");
+          	  else
+          		  strcat(formatString,os ? ",%d]" : ",%r]");
           	  strcat(formatString,ss ? ",%d" : ",%r");
-          	  my_sprintf(state, state->operandBuffer, formatString, fieldA, srcStr, fieldB, dstStr, fieldB, entry_size_val, offset_val, size_val);
+          	  if (cldrs)
+          		  my_sprintf(state, state->operandBuffer, formatString, fieldA, srcStr, fieldB, dstStr, fieldB, entry_size_val, offset_val, size_val);
+          	  else
+          		  my_sprintf(state, state->operandBuffer, formatString, fieldA, srcStr, fieldB, dstStr, fieldB, entry_size_val, offset_val, fieldC, size_val);
       	  }
       }
       break;

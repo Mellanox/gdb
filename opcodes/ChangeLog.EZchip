@@ -1,3 +1,7 @@
+2014-2-6  Roy Vardi  <royv@ezchip.com>
+
+* arcompact-dis.c: Define default CLASS indication and fix instruction format to contain register for CLASS bits
+
 2014-1-26  Roy Vardi  <royv@ezchip.com>
 
 * arcompact-dis.c: Changed subopcode for lkpitcm,lkpetcm,wkup,idxalc,sidxfre,idxfre,jobalc
