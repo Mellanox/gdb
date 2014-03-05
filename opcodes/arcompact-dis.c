@@ -5632,7 +5632,7 @@ dsmOneArcInst (bfd_vma addr, struct arcDisState *state, disassemble_info * info)
     	        if ( num2 == 0 )  num2 = 4;
     	        if ( num3 == 0 )  num3 = 8;
     	        if ( num6 == 0 ) num6 = 64;
-    	        if ( ( subopcode == 0x26 ) && ( c == 0 ) ) instrName = "sidxalc";
+    	        if ( ( subopcode == 0x1C ) && ( c == 0 ) ) instrName = "sidxalc";
     	        if ( ( subopcode == 0x10 ) && ( num3 == 1 ) ) instrName = "sbdalc";
     	        if ( ( subopcode == 0x1F ) && ( c == 0 ) ) instrName = "sjobalc";
     	        write_instr_name();
@@ -5649,7 +5649,7 @@ dsmOneArcInst (bfd_vma addr, struct arcDisState *state, disassemble_info * info)
         	        strcat(formatString,",[cm:%r],%d");
         	        my_sprintf(state, state->operandBuffer, formatString, fieldA, fieldB, num6);
     	        	break;
-    	        case 0x26:
+    	        case 0x1C:
    	        	if ( c == 0 ) {
    	           	        WRITE_FORMAT_COMMA_x(B);
         	        	my_sprintf(state, state->operandBuffer, formatString, fieldA, fieldB);

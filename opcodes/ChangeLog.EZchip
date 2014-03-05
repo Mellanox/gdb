@@ -1,3 +1,7 @@
+2014-3-5  Roy Vardi  <royv@ezchip.com>
+
+* arcompact-dis.c: Change sidxalc subopcode to 0x1C
+
 2014-2-6  Roy Vardi  <royv@ezchip.com>
 
 * arcompact-dis.c: Define default CLASS indication and fix instruction format to contain register for CLASS bits
