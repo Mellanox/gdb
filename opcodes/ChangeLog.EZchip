@@ -1,19 +1,70 @@
-2014-3-5  Roy Vardi  <royv@ezchip.com>
+2014-6-2  Roy Vardi  <royv@ezchip.com>
 
-* arcompact-dis.c: Change sidxalc subopcode to 0x1C
+* arcompact-dis.c: Fix cp .na flag encoding and decoding
+
+2014-6-1  Roy Vardi  <royv@ezchip.com>
+
+* arcompact.c: Support aric virtual commands and remove aricl unsupported commands
+
+2014-5-21  Roy Vardi  <royv@ezchip.com>
+
+* arcompact-dis.c: Added efabgt instruction
+
+2014-5-18  Roy Vardi  <royv@ezchip.com>
+
+* arcompact-dis,c: Remove gmsg instruction support
+
+2014-5-5  Roy Vardi  <royv@ezchip.com>
+
+* arc-nps.h: Added <.f> flag for exc{b,c}
+
+2014-3-30  Roy Vardi  <royv@ezchip.com>
+
+* arc-nps.h: Fix sjobalc subopcode encoding
+
+2014-3-26  Roy Vardi  <royv@ezchip.com>
+
+* arcompact-dis.c: Fix idxfre,idxalc,bdfre,bdalc objdump
+
+2014-3-25  Roy Vardi  <royv@ezchip.com>
+
+* arcompact-dis.c: Fix decoding class 75 bug
+
+2014-3-23  Roy Vardi  <royv@ezchip.com>
+
+* arc-nps.h: Change target size of atomic dual add instruction
+* arcompact-dis.c: Likewise
+
+2014-3-11  Roy Vardi  <royv@ezchip.com>
+
+* arc-nps.h: Changed subopcode for wkup
 
 2014-2-6  Roy Vardi  <royv@ezchip.com>
 
-* arcompact-dis.c: Define default CLASS indication and fix instruction format to contain register for CLASS bits
+* arc-nps.h: Define default CLASS indication and fix instruction format to contain register for CLASS bits
+* arcompact-dis.c: Likewise
+* arc-opc-old.c: Likewise
 
 2014-1-26  Roy Vardi  <royv@ezchip.com>
 
-* arcompact-dis.c: Changed subopcode for lkpitcm,lkpetcm,wkup,idxalc,sidxfre,idxfre,jobalc
+* arc-nps.h: Changed subopcode for lkpitcm,lkpetcm,wkup,idxalc,sidxfre,idxfre,jobalc
+* arcompact-dis.c: Likewise
+
+2014-1-20  Roy Vardi  <royv@ezchip.com>
+
+* arc-nps.h: Support dual flags options movbi.cl.f and movbi.f.cl
 
 2014-1-19  Roy Vardi  <royv@ezchip.com>
 
+* arc-nps.h: Support sd and xd address types for atomic operations
 * arccompact-dis.c (dsmOneArcInst): Updated decoding_class 75 to support sd and xd address types for atomic operations
 
-2013-11-30  Roy Vardi  <royv@ezchip.com>
-  
-* arcompact-dis.c: EZchip NPS additions and changes
+2013-11-28  Roy Vardi  <royv@ezchip.com>
+ 
+* arc-opc-old.c: EZchip NPS additions and changes
+
+2013-11-28  Roy Vardi  <royv@ezchip.com>
+ 
+* arc-nps.h: EZchip NPS additions and changes
+* arc-opc-old.c: Likewise
+* arcompact-dis.c: Likewise
