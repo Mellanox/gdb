@@ -1,3 +1,11 @@
+2014-6-16  Roy Vardi  <royv@ezchip.com>
+
+* arcompact-dis.c: Fix offset in cp csd type
+
+2014-6-11  Roy Vardi  <royv@ezchip.com>
+
+* arcompact-dis.c: Fix cp command flavour
+
 2014-6-2  Roy Vardi  <royv@ezchip.com>
 
 * arcompact-dis.c: Fix cp .na flag encoding and decoding
