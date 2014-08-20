@@ -6066,8 +6066,14 @@ dsmOneArcInst (bfd_vma addr, struct arcDisState *state, disassemble_info * info)
     	    		    		my_sprintf(state, state->operandBuffer, formatString, fieldA, srcStr, ccm, imm);
     	    	    		}
     	    	    		else {
-         	    	    		strcat(formatString,",[%s%r],0x%04x");
-        	    	    		my_sprintf(state, state->operandBuffer, formatString, fieldA, srcStr, fieldB, ccm);
+    	    	    			if ((limm_value & 0x00400000) >> 22) {
+    	    	    				strcat(formatString,",[%s%r],0x%04x");
+    	    	    				my_sprintf(state, state->operandBuffer, formatString, fieldA, srcStr, fieldB, ccm);
+    	    	    			}
+    	    	    			else {
+    	    	    				strcat(formatString,",[%s%r,%r],0x%04x");
+    	    	    				my_sprintf(state, state->operandBuffer, formatString, fieldA, srcStr, fieldB, fieldC, ccm);
+    	    	    			}
     	    	    		}
     	    		    	break;
     	    	    	    case 02:
@@ -6174,6 +6180,22 @@ dsmOneArcInst (bfd_vma addr, struct arcDisState *state, disassemble_info * info)
         	    	break;
         	    case  9:
         	    	switch(numDp) {
+        	    		case 01:
+	    	    	    	if ( subOpc1 != 3) {
+    		    	    		strcat(formatString,",[%s0x%04x],%d");
+    	    		    		my_sprintf(state, state->operandBuffer, formatString, fieldA, srcStr, ccm, imm);
+    	    	    		}
+    	    	    		else {
+    	    	    			if ((limm_value & 0x00400000) >> 22) {
+    	    	    				strcat(formatString,",[%s%r],0x%04x");
+    	    	    				my_sprintf(state, state->operandBuffer, formatString, fieldA, srcStr, fieldB, ccm);
+    	    	    			}
+    	    	    			else {
+    	    	    				strcat(formatString,",[%s%r,%r],0x%04x");
+    	    	    				my_sprintf(state, state->operandBuffer, formatString, fieldA, srcStr, fieldB, fieldC, ccm);
+    	    	    			}
+    	    	    		}
+        	    		break;
         	    	    case 11:
         	    	    	if ((limm_value & 0x00400000) >> 22) {
         	    	    		strcat(formatString,",[%s%r],[%s%r],0x%04x");
@@ -7984,7 +8006,7 @@ dsmOneArcInst (bfd_vma addr, struct arcDisState *state, disassemble_info * info)
       	  if ( na != 0 ) strcat(name,".na");
       	  if ( x != 0 ) strcat(name,".x");
 
-    	  offset_val = os ? ((limm_value >> 10) & 0x3ff) : fieldC;
+      	  offset_val = os ? ((limm_value >> 8) & 0xff) : fieldC;
     	  entry_size_val = es ? (16 << ((limm_value >> 20) & 0x7)) : fieldC;
     	  size_val = ss ? ((limm_value >> 0) & 0x3ff) : fieldC;
 
