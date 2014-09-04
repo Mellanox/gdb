@@ -2392,6 +2392,9 @@ dsmOneArcInst (bfd_vma addr, struct arcDisState *state, disassemble_info * info)
     	    	      case 0: instrName = "schd.rw";  break;
     	    	      case 1: instrName = "schd.wft";  break;
     	    	      case 2: instrName = "schd.rd";  break;
+    	    	      case 5: instrName = "schd.wft.ie1";  break;
+    	    	      case 9: instrName = "schd.wft.ie2";  break;
+    	    	      case 13: instrName = "schd.wft.ie12";  break;
     	    	      default: instrName = "schd.??";  break;
     	    	  }
     	    	  break;
@@ -2429,7 +2432,6 @@ dsmOneArcInst (bfd_vma addr, struct arcDisState *state, disassemble_info * info)
       case 0x16: instrName = "asri"; decodingClass = 69; break;
       case 0x17: instrName = "sbdfre"; decodingClass = 0; break;
       case 0x18: instrName = "bdbgt"; decodingClass = 0; break;
-      case 0x19: instrName = "idxbgt"; decodingClass = 0; break;
       case 0x1A: instrName = "jobbgt"; decodingClass = 0; break;
 
       case 0x20: instrName = "dcet"; decodingClass = 62; break;
@@ -2576,19 +2578,19 @@ dsmOneArcInst (bfd_vma addr, struct arcDisState *state, disassemble_info * info)
             case 8:
           	   instrName = "pcrcycl.cl"; decodingClass = 75; break;
             case 9:
-           	   instrName = "cbclr"; decodingClass = 75; break;
+               instrName = "cgi.di"; decodingClass = 75; break;
             case 10:
-           	   instrName = "cbset"; decodingClass = 75; break;
+           	   instrName = "cgi.di"; decodingClass = 75; break;
             case 11:
-           	   instrName = "cbcswp"; decodingClass = 75; break;
+               instrName = "cgi.di"; decodingClass = 75; break;
             case 12:
-           	   instrName = "cbwr"; decodingClass = 75; break;
+               instrName = "cgi.di"; decodingClass = 75; break;
             case 13:
-           	   instrName = "cbrd"; decodingClass = 75; break;
+               instrName = "cgi.di"; decodingClass = 75; break;
             case 14:
-           	   instrName = "crd"; decodingClass = 75; break;
+           	   instrName = "cgi.di"; decodingClass = 75; break;
             case 15:
-           	   instrName = "cld"; decodingClass = 75; break;
+               instrName = "cgi.di"; decodingClass = 75; break;
             case 16:
           	   instrName = "atst"; decodingClass = 75; break;
             case 17:
@@ -2604,21 +2606,21 @@ dsmOneArcInst (bfd_vma addr, struct arcDisState *state, disassemble_info * info)
             case 22:
           	   instrName = "xld"; decodingClass = 75; break;
             case 23:
-           	   instrName = "cmld"; decodingClass = 75; break;
+           	   instrName = "cgi.di"; decodingClass = 75; break;
             case 24:
-           	   instrName = "cmst"; decodingClass = 75; break;
+           	   instrName = "cgi.di"; decodingClass = 75; break;
             case 25:
-           	   instrName = "cminit"; decodingClass = 75; break;
+            	instrName = "cgi.di"; decodingClass = 75; break;
             case 26:
-           	   instrName = "cminit.rst"; decodingClass = 75; break;
+            	instrName = "cgi.di"; decodingClass = 75; break;
             case 27:
-           	   instrName = "cwrdb"; decodingClass = 75; break;
+           	   instrName = "cgi.di"; decodingClass = 75; break;
             case 28:
-           	   instrName = "cwrde"; decodingClass = 75; break;
+           	   instrName = "cgi.di"; decodingClass = 75; break;
             case 30:
-            	instrName = "cwcfg"; decodingClass = 75; break;
+            	instrName = "cgi.di"; decodingClass = 75; break;
             case 31:
-            	instrName = "cwchk"; decodingClass = 75; break;
+            	instrName = "cgi"; decodingClass = 75; break;
             default:
 	               instrName = "??? (2[3])";
 	               state->flow = invalid_instr;
@@ -5575,6 +5577,7 @@ dsmOneArcInst (bfd_vma addr, struct arcDisState *state, disassemble_info * info)
     {
     	int ib;
     	int c;
+    	int m;
        	int num2;
        	int num3;
        	int num4;
@@ -5633,6 +5636,8 @@ dsmOneArcInst (bfd_vma addr, struct arcDisState *state, disassemble_info * info)
       	        num4 = BITS(state->words[0],6,9);
        	        num6 = BITS(state->words[0],6,11);
        	        numOfJobs = BITS(state->words[0],6,8);
+       	        ib = BITS(state->words[0],10,10);
+       	        m = BITS(state->words[0],11,11);
        	        if (numOfJobs == 0) numOfJobs = 8;
     	        if ( num2 == 0 )  num2 = 4;
     	        if ( num3 == 0 )  num3 = 8;
@@ -5663,8 +5668,14 @@ dsmOneArcInst (bfd_vma addr, struct arcDisState *state, disassemble_info * info)
     	        	break;
     	        case 0x28:
     	        case 0x11:
-   	        	    strcat(formatString,",[cm:%r],%r,%d");
-   	        	    my_sprintf(state, state->operandBuffer, formatString, fieldA, fieldB, fieldB, num3);
+    	        	if (m == 1) {
+    	        		strcat(formatString,",[cm:%r],%r,%d,%d");
+    	        		my_sprintf(state, state->operandBuffer, formatString, fieldA, fieldB, fieldB, ib, num3);
+    	        	}
+    	        	else {
+    	        		strcat(formatString,",[cm:%r],%r,%d");
+    	        		my_sprintf(state, state->operandBuffer, formatString, fieldA, fieldB, fieldB, num3);
+    	        	}
        	        	break;
     	        case 0x1C:
     	        case 0x1D:
@@ -5735,6 +5746,8 @@ dsmOneArcInst (bfd_vma addr, struct arcDisState *state, disassemble_info * info)
         	int numDp;
         	int numSp;
         	char name[20];
+        	int cldrs;
+        	int i;
           	fieldA = 62; // dummy value only to update limm_value
             CHECK_FIELD(fieldA);
            	fieldA = BITS(state->words[0],21,26);
@@ -5762,6 +5775,8 @@ dsmOneArcInst (bfd_vma addr, struct arcDisState *state, disassemble_info * info)
         	bdOff = limm_value & 0x000003FF;
         	typeAll = (limm_value & 0x0f000000) >> 24;
         	size10 = (limm_value & 0x003FF000) >> 12;
+        	cldrs = (limm_value & 0x00400000) >> 22;
+        	i = (limm_value & 0x03000000) >> 24;
         	if ( size10 == 0 ) size10 = 0x400;
         	if ( ( (typeAll & 0x03) == 0x01 ) && ( imm == 0 ) ) imm = 0x100;
         	dstStr = "??:";
@@ -5885,8 +5900,14 @@ dsmOneArcInst (bfd_vma addr, struct arcDisState *state, disassemble_info * info)
         	    case 12:
         	    	switch(numDp) {
         	    	    case 01:
-     	    	    		strcat(formatString,",[%s%r],%r");
-     	    	    		my_sprintf(state, state->operandBuffer, formatString, fieldA, srcStr, fieldB, fieldC);
+        	    	    	if (cldrs) {
+         	    	    		strcat(formatString,",[%s%r],%r");
+         	    	    		my_sprintf(state, state->operandBuffer, formatString, fieldA, srcStr, fieldB, fieldC);
+        	    	    	}
+        	    	    	else {
+         	    	    		strcat(formatString,",[%s%r,%r],%r");
+         	    	    		my_sprintf(state, state->operandBuffer, formatString, fieldA, srcStr, fieldB, fieldC, fieldC);
+        	    	    	}
      	    	    		break;
 	    	    	    case 02:
 	    	    	    	if ((limm_value & 0x00800000) >> 23) {
@@ -5909,8 +5930,32 @@ dsmOneArcInst (bfd_vma addr, struct arcDisState *state, disassemble_info * info)
     	    	    	    		my_sprintf(state, state->operandBuffer, formatString, fieldA, dstStr, fieldB, fieldC, srcStr, fieldB, fieldC);
     	    	    	    	}
     	    	    	    	else {
-    	    	    	    		strcat(formatString,",[%s%r],[%s%r,%r],%r");
-    	    	    	    		my_sprintf(state, state->operandBuffer, formatString, fieldA, dstStr, fieldB, srcStr, fieldB, fieldC, fieldC);
+    	    	    	    		if ((subOpc2 == 5) || (subOpc2 == 7)) {
+    	    	    	    			if (!cldrs) {
+    	    	    	    				if (subOpc1 == 1) {
+            	    	    	    			strcat(formatString,",[%s%r],[%s%r],%r");
+            	    	    	    			my_sprintf(state, state->operandBuffer, formatString, fieldA, dstStr, fieldB, srcStr, fieldB, fieldC);
+    	    	    	    				}
+    	    	    	    				else {
+            	    	    	    			strcat(formatString,",[%s%r],[%s%r,%r],%r");
+            	    	    	    			my_sprintf(state, state->operandBuffer, formatString, fieldA, dstStr, fieldB, srcStr, fieldB, fieldC, fieldC);
+    	    	    	    				}
+    	    	    	    			}
+    	    	    	    			else {
+        	    	    	    			strcat(formatString,",[%s%r],[%s%r],%r");
+        	    	    	    			my_sprintf(state, state->operandBuffer, formatString, fieldA, dstStr, fieldB, srcStr, fieldB, fieldC);
+    	    	    	    			}
+    	    	    	    		}
+    	    	    	    		else {
+    	    	    	    			if (!cldrs){
+        	    	    	    			strcat(formatString,",[%s%r,%r],[%s%r,%r],%r");
+        	    	    	    			my_sprintf(state, state->operandBuffer, formatString, fieldA, dstStr, fieldB, fieldC, srcStr, fieldB, fieldC, fieldC);
+    	    	    	    			}
+    	    	    	    			else {
+        	    	    	    			strcat(formatString,",[%s%r],[%s%r,%r],%r");
+        	    	    	    			my_sprintf(state, state->operandBuffer, formatString, fieldA, dstStr, fieldB, srcStr, fieldB, fieldC, fieldC);
+    	    	    	    			}
+    	    	    	    		}
     	    	    	    	}
     	    	    	    }
     	    	    		break;
@@ -5925,8 +5970,26 @@ dsmOneArcInst (bfd_vma addr, struct arcDisState *state, disassemble_info * info)
         	    	    			my_sprintf(state, state->operandBuffer, formatString, fieldA, dstStr, fieldB, srcStr, fieldB, fieldC, fieldC, fieldC);
         	    	    		}
         	    	    		else {
-        	    	    			strcat(formatString,",[%s%r,%r],[%s%r,%r,%r],%r");
-        	    	    			my_sprintf(state, state->operandBuffer, formatString, fieldA, dstStr, fieldB, fieldC, srcStr, fieldB, fieldC, fieldC, fieldC);
+        	    	    			if (subOpc1 == 2) {
+        	    	    				if (!cldrs) {
+        	    	    					if (subOpc2 == 4){
+        	    	    						strcat(formatString,",[%s%r],[%s%r,%r,%r],%r");
+        	    	    						my_sprintf(state, state->operandBuffer, formatString, fieldA, dstStr, fieldB, srcStr, fieldB, fieldC, fieldC, fieldC);
+        	    	    					}
+        	    	    					else {
+        	    	    						strcat(formatString,",[%s%r,%r],[%s%r,%r,%r],%r");
+        	    	    						my_sprintf(state, state->operandBuffer, formatString, fieldA, dstStr, fieldB, fieldC, srcStr, fieldB, fieldC, fieldC, fieldC);
+        	    	    					}
+        	    	    				}
+        	    	    				else {
+        	    	    					strcat(formatString,",[%s%r],[%s%r,%r,%r],%r");
+        	    	    					my_sprintf(state, state->operandBuffer, formatString, fieldA, dstStr, fieldB, srcStr, fieldB, fieldC, fieldC, fieldC);
+        	    	    				}
+        	    	    			}
+        	    	    			else {
+        	    	    				strcat(formatString,",[%s%r,%r],[%s%r,%r,%r],%r");
+        	    	    				my_sprintf(state, state->operandBuffer, formatString, fieldA, dstStr, fieldB, fieldC, srcStr, fieldB, fieldC, fieldC, fieldC);
+        	    	    			}
         	    	    		}
         	    	    	}
         	    	    	break;
@@ -5941,8 +6004,20 @@ dsmOneArcInst (bfd_vma addr, struct arcDisState *state, disassemble_info * info)
         	    	    			my_sprintf(state, state->operandBuffer, formatString, fieldA, dstStr, fieldB, fieldC, fieldC, srcStr, fieldB, fieldC);
         	    	    		}
         	    	    		else {
-        	    	    			strcat(formatString,",[%s%r,%r,%r],[%s%r,%r],%r");
-        	    	    			my_sprintf(state, state->operandBuffer, formatString, fieldA, dstStr, fieldB, fieldC, fieldC, srcStr, fieldB, fieldC, fieldC);
+        	    	    			if ((subOpc1 == 2) && ((subOpc2 == 6) || (subOpc2 == 6))) {
+        	    	    				if (cldrs) {
+        	    	    					strcat(formatString,",[%s%r,%r],[%s%r],%r");
+        	    	    					my_sprintf(state, state->operandBuffer, formatString, fieldA, dstStr, fieldB, fieldC, srcStr, fieldB, fieldC);
+        	    	    				}
+        	    	    				else {
+        	    	    					strcat(formatString,",[%s%r,%r,%r],[%s%r],%r");
+        	    	    					my_sprintf(state, state->operandBuffer, formatString, fieldA, dstStr, fieldB, fieldC, fieldC, srcStr, fieldB, fieldC);
+        	    	    				}
+        	    	    			}
+        	    	    			else {
+        	    	    				strcat(formatString,",[%s%r,%r,%r],[%s%r,%r],%r");
+        	    	    				my_sprintf(state, state->operandBuffer, formatString, fieldA, dstStr, fieldB, fieldC, fieldC, srcStr, fieldB, fieldC, fieldC);
+        	    	    			}
         	    	    		}
         	    	    	}
         	    	    	break;
@@ -5962,8 +6037,15 @@ dsmOneArcInst (bfd_vma addr, struct arcDisState *state, disassemble_info * info)
         	    case  3:
         	    	switch(numDp) {
 			     case 01:
-				strcat(formatString,",[%s0x%04x],%r");
-				my_sprintf(state, state->operandBuffer, formatString, fieldA, srcStr, ccm, fieldC);
+			    	 if (i == 0) {
+							strcat(formatString,",[%s%r,%r],%r");
+							my_sprintf(state, state->operandBuffer, formatString, fieldA, srcStr, fieldB, fieldC, fieldC);
+			    	 }
+			    	 else {
+							strcat(formatString,",[%s0x%04x],%r");
+							my_sprintf(state, state->operandBuffer, formatString, fieldA, srcStr, ccm, fieldC);
+			    	 }
+
 				break;
 			     case 02:
          	    	    	strcat(formatString,",[%s0x%04x,%r],%r");
@@ -5991,13 +6073,33 @@ dsmOneArcInst (bfd_vma addr, struct arcDisState *state, disassemble_info * info)
 	    	    	    	my_sprintf(state, state->operandBuffer, formatString, fieldA, dstStr, fieldB, srcStr, fieldB, fieldC);
 						}
 						else {
-							strcat(formatString,",[%s%r],[%s0x%04x,%r],%r");
-							my_sprintf(state, state->operandBuffer, formatString, fieldA, dstStr, fieldB, srcStr, ccm, fieldC, fieldC);
+							if (subOpc1 == 3) {
+								strcat(formatString,",[%s%r,%r],[%s%r],%r");
+								my_sprintf(state, state->operandBuffer, formatString, fieldA, dstStr, fieldB, fieldC, srcStr, fieldB, fieldC);
+							}
+							else {
+								if (subOpc2 == 7) {
+									strcat(formatString,",[%s%r],[%s0x%04x],%r");
+									my_sprintf(state, state->operandBuffer, formatString, fieldA, dstStr, fieldB, srcStr, ccm, fieldC);
+								}
+								else {
+									strcat(formatString,",[%s%r],[%s0x%04x,%r],%r");
+									my_sprintf(state, state->operandBuffer, formatString, fieldA, dstStr, fieldB, srcStr, ccm, fieldC, fieldC);
+								}
+
+							}
 						}
 					}
 					else {
-						strcat(formatString,",[%s%r],[%s%r],%r");
-						my_sprintf(state, state->operandBuffer, formatString, fieldA, dstStr, fieldB, srcStr, fieldB, fieldC);
+						if (subOpc2 == 5){
+							strcat(formatString,",[%s%r],[%s%d],%r");
+							my_sprintf(state, state->operandBuffer, formatString, fieldA, dstStr, fieldB, srcStr, ccm, fieldC);
+						}
+						else {
+							strcat(formatString,",[%s%r],[%s%r],%r");
+							my_sprintf(state, state->operandBuffer, formatString, fieldA, dstStr, fieldB, srcStr, fieldB, fieldC);
+						}
+
 					}
 				}
 				break;
@@ -6064,8 +6166,14 @@ dsmOneArcInst (bfd_vma addr, struct arcDisState *state, disassemble_info * info)
     	    	    			my_sprintf(state, state->operandBuffer, formatString, fieldA, dstStr, fieldB, srcStr, ccm, imm);
     	    	    		}
     	    	    		else {
-         	    	    		strcat(formatString,",[%s%r],[%s%r],0x%04x");
-        	    	    		my_sprintf(state, state->operandBuffer, formatString, fieldA, dstStr, fieldB, srcStr, fieldB, ccm);
+    	    	    			if (cldrs) {
+    	    	    				strcat(formatString,",[%s%r],[%s%r],0x%04x");
+    	    	    				my_sprintf(state, state->operandBuffer, formatString, fieldA, dstStr, fieldB, srcStr, fieldB, ccm);
+    	    	    			}
+    	    	    			else {
+    	    	    				strcat(formatString,",[%s%r,%r],[%s%r],0x%04x");
+    	    	    				my_sprintf(state, state->operandBuffer, formatString, fieldA, dstStr, fieldB, fieldC, srcStr, fieldB, ccm);
+    	    	    			}
     	    	    		}
     	    		    	break;
     	    	    	    case 12:
@@ -6185,8 +6293,20 @@ dsmOneArcInst (bfd_vma addr, struct arcDisState *state, disassemble_info * info)
         	    	    			my_sprintf(state, state->operandBuffer, formatString, fieldA, dstStr, fieldB, fieldC, srcStr, fieldB, ccm);
         	    	    		}
         	    	    		else {
-        	    	    			strcat(formatString,",[%s%r],[%s%r,%r],0x%04x");
-        	    	    			my_sprintf(state, state->operandBuffer, formatString, fieldA, dstStr, fieldB, srcStr, fieldB, fieldC, ccm);
+        	    	    			if (cldrs) {
+        	    	    				strcat(formatString,",[%s%r],[%s%r,%r],0x%04x");
+        	    	    				my_sprintf(state, state->operandBuffer, formatString, fieldA, dstStr, fieldB, srcStr, fieldB, fieldC, ccm);
+        	    	    			}
+        	    	    			else {
+        	    	    				if (subOpc2 == 5) {
+            	    	    				strcat(formatString,",[%s%r],[%s%r,%r],0x%04x");
+            	    	    				my_sprintf(state, state->operandBuffer, formatString, fieldA, dstStr, fieldB, srcStr, fieldB, fieldC, ccm);
+        	    	    				}
+        	    	    				else {
+            	    	    				strcat(formatString,",[%s%r,%r],[%s%r,%r],0x%04x");
+            	    	    				my_sprintf(state, state->operandBuffer, formatString, fieldA, dstStr, fieldB, fieldC, srcStr, fieldB, fieldC, ccm);
+        	    	    				}
+        	    	    			}
         	    	    		}
         	    	    	}
         	    	    	break;
@@ -6319,16 +6439,23 @@ dsmOneArcInst (bfd_vma addr, struct arcDisState *state, disassemble_info * info)
 		            	if ((subOpc1 == 3) && (subOpc2 == 1)) {
 		            		if ((limm_value & 0x00400000) >> 22) {
 		            			strcat(formatString,",[%s%d],%r");
-		            			my_sprintf(state, state->operandBuffer, formatString, fieldA, srcStr, size10, fieldB);
+		            			my_sprintf(state, state->operandBuffer, formatString, fieldA, srcStr, ccm, fieldB);
 		            		}
 		            		else {
 		            			strcat(formatString,",[%s%d,%r],%r");
-		            			my_sprintf(state, state->operandBuffer, formatString, fieldA, srcStr, size10, fieldC, fieldB);
+		            			my_sprintf(state, state->operandBuffer, formatString, fieldA, srcStr, ccm, fieldC, fieldB);
 		            		}
 		            	}
 		            	else {
-		            		strcat(formatString,",[%s%r],%d");
-		            		my_sprintf(state, state->operandBuffer, formatString, fieldA, srcStr, fieldB, size10);
+		            		if (cldrs) {
+			            		strcat(formatString,",[%s%d],%r");
+			            		my_sprintf(state, state->operandBuffer, formatString, fieldA, srcStr, ccm, fieldB);
+		            		}
+		            		else {
+			            		strcat(formatString,",[%s%r],%d");
+			            		my_sprintf(state, state->operandBuffer, formatString, fieldA, srcStr, fieldB, size10);
+		            		}
+
 		            	}
 				break;
         	    	    case 02:
@@ -6354,8 +6481,22 @@ dsmOneArcInst (bfd_vma addr, struct arcDisState *state, disassemble_info * info)
 								my_sprintf(state, state->operandBuffer, formatString, fieldA, dstStr, fieldB, fieldC, srcStr, ccm, fieldC);
 							}
 							else {
-								strcat(formatString,",[%s%r],[%s0x%04x,%r],%r");
-								my_sprintf(state, state->operandBuffer, formatString, fieldA, dstStr, fieldB, srcStr, ccm, fieldC, fieldC);
+								if (!cldrs) {
+									if (subOpc2 == 5) {
+										strcat(formatString,",[%s%r],[%s0x%04x,%r],%r");
+										my_sprintf(state, state->operandBuffer, formatString, fieldA, dstStr, fieldB, srcStr, ccm, fieldC, fieldC);
+									}
+									else {
+										strcat(formatString,",[%s%r,%r],[%s0x%04x,%r],%r");
+										my_sprintf(state, state->operandBuffer, formatString, fieldA, dstStr, fieldB, fieldC, srcStr, ccm, fieldC, fieldC);
+									}
+
+								}
+								else {
+									strcat(formatString,",[%s%r],[%s0x%04x,%r],%r");
+									my_sprintf(state, state->operandBuffer, formatString, fieldA, dstStr, fieldB, srcStr, ccm, fieldC, fieldC);
+								}
+
 							}
 						}
 					}
@@ -6375,8 +6516,20 @@ dsmOneArcInst (bfd_vma addr, struct arcDisState *state, disassemble_info * info)
 							my_sprintf(state, state->operandBuffer, formatString, fieldA, dstStr, ccm, fieldC, srcStr, fieldB, fieldC);
 						}
 						else {
-							strcat(formatString,",[%s0x%04x],[%s%r,%r],%r");
-							my_sprintf(state, state->operandBuffer, formatString, fieldA, dstStr, ccm, srcStr, fieldB, fieldC, fieldC);
+							if (!cldrs) {
+								if (subOpc2 == 5) {
+									strcat(formatString,",[%s0x%04x],[%s%r,%r],%r");
+									my_sprintf(state, state->operandBuffer, formatString, fieldA, dstStr, ccm, srcStr, fieldB, fieldC, fieldC);
+								}
+								else {
+									strcat(formatString,",[%s0x%04x,%r],[%s%r,%r],%r");
+									my_sprintf(state, state->operandBuffer, formatString, fieldA, dstStr, ccm, fieldC, srcStr, fieldB, fieldC, fieldC);
+								}
+							}
+							else {
+								strcat(formatString,",[%s0x%04x],[%s%r,%r],%r");
+								my_sprintf(state, state->operandBuffer, formatString, fieldA, dstStr, ccm, srcStr, fieldB, fieldC, fieldC);
+							}
 						}
 					}
 				}
@@ -6797,6 +6950,7 @@ dsmOneArcInst (bfd_vma addr, struct arcDisState *state, disassemble_info * info)
     	  int type;
     	  int size;
     	  int target_size;
+    	  int entry_size;
     	  int subOpcode;
     	  char lCommand[30];
     	  int di;
@@ -6814,12 +6968,18 @@ dsmOneArcInst (bfd_vma addr, struct arcDisState *state, disassemble_info * info)
     	  strcpy(lCommand,instrName);
     	  switch (target_size) {
     	      case 1:
+                 if ( subOpcode == 0 ) {
+                     strcpy(lCommand,"???"); break;
+                 }
     	    	  if ( subOpcode != 20 ) {
     	    	      strcat(lCommand,"b"); break;
     	    	  }
     	    	  strcpy(lCommand,"aricb.r");
     	    	  break;
     	      case 2:
+                 if ( subOpcode == 0 ) {
+                     strcpy(lCommand,"???"); break;
+                 }
     	    	  if ( subOpcode != 20 ) {
     	    	      strcat(lCommand,"w"); break;
     	    	  }
@@ -6828,7 +6988,7 @@ dsmOneArcInst (bfd_vma addr, struct arcDisState *state, disassemble_info * info)
     	      case 3:
     	    	  break;
     	      case 4:
-    	    	  if (((subOpcode == 3) && (type != 0)) || ((subOpcode != 20) && (subOpcode != 3))) {
+    	    	  if (subOpcode != 20) {
     	    		  strcat(lCommand,"l"); break;
     	    	  }
     	    	  break;
@@ -6855,8 +7015,8 @@ dsmOneArcInst (bfd_vma addr, struct arcDisState *state, disassemble_info * info)
 	          case 1: strcpy(strType,"xa:"); break;
 	          case 2: strcpy(strType,"scd:");
 	          	  switch(subOpcode) {
-	          	  case 1: strcpy(lCommand,"crst"); break;
-	          	  case 16: strcpy(lCommand,"cst"); break;
+	          	  case 1: strcpy(lCommand,"cgi.di"); break;
+	          	  case 16: strcpy(lCommand,"cgi.di"); break;
 	          	  default: break;
 	          	  }
                           break;
@@ -6886,36 +7046,77 @@ dsmOneArcInst (bfd_vma addr, struct arcDisState *state, disassemble_info * info)
 	          case 6:
 	        	  strcpy(strType,"cd:");
 	        	  switch (subOpcode) {
-	        	  	  case 0: strcpy(lCommand,"cinit"); break;
-        	  	  	  case 1: strcpy(lCommand,"crst"); break;
-        	  	  	  case 2: strcpy(lCommand,"cincr"); break;
-        	  	  	  case 3: strcpy(lCommand,"cdecr"); break;
-        	  	  	  case 4: strcpy(lCommand,"cgetc"); break;
-        	  	  	  case 5: strcpy(lCommand,"cchkc"); break;
-        	  	  	  case 6: strcpy(lCommand,"cincr1"); break;
-        	  	  	  case 7: strcpy(lCommand,"cdecr1"); break;
-        	  	  	  case 8: strcpy(lCommand,"cdincr"); break;
-        	  	  	  case 9: strcpy(lCommand,"cbclr"); break;
-        	  	  	  case 10: strcpy(lCommand,"cbset"); break;
-        	  	  	  case 11: strcpy(lCommand,"cbcswp"); break;
-        	  	  	  case 12: strcpy(lCommand,"cbwr"); break;
-        	  	  	  case 13: strcpy(lCommand,"cbrd"); break;
-        	  	  	  case 14: strcpy(lCommand,"crd"); break;
-        	  	  	  case 15: strcpy(lCommand,"cld"); break;
-        	  	  	  case 16: strcpy(lCommand,"cst"); break;
-        	  	  	  case 17: strcpy(lCommand,"cdecrc"); break;
-        	  	  	  case 22: strcpy(lCommand,"cftch"); break;
-        	  	  	  case 23: strcpy(lCommand,"cmld"); break;
-        	  	  	  case 24: strcpy(lCommand,"cmst"); break;
-        	  	  	  case 25: strcpy(lCommand,"cminit"); break;
-        	  	  	  case 26: strcpy(lCommand,"cminit.rst"); break;
-        	  	  	  case 27: strcpy(lCommand,"cwrdb"); break;
-        	  	  	  case 28: strcpy(lCommand,"cwrde"); break;
+	        	  	  case 0: strcpy(lCommand,"cgi.di"); break;
+        	  	  	  case 1: strcpy(lCommand,"cgi.di"); break;
+        	  	  	  case 2: strcpy(lCommand,"cgi.di"); break;
+        	  	  	  case 3: strcpy(lCommand,"cgi.di"); break;
+        	  	  	  case 4: strcpy(lCommand,"cgi.di"); break;
+        	  	  	  case 5: strcpy(lCommand,"cgi.di"); break;
+        	  	  	  case 6: strcpy(lCommand,"cgi.di"); break;
+        	  	  	  case 7: strcpy(lCommand,"cgi.di"); break;
+        	  	  	  case 8: strcpy(lCommand,"cgi.di"); break;
+        	  	  	  case 9: strcpy(lCommand,"cgi.di"); break;
+        	  	  	  case 10: strcpy(lCommand,"cgi.di"); break;
+        	  	  	  case 11: strcpy(lCommand,"cgi.di"); break;
+        	  	  	  case 12: strcpy(lCommand,"cgi.di"); break;
+        	  	  	  case 13: strcpy(lCommand,"cgi.di"); break;
+        	  	  	  case 14: strcpy(lCommand,"cgi.di"); break;
+        	  	  	  case 15: strcpy(lCommand,"cgi.di"); break;
+        	  	  	  case 16: strcpy(lCommand,"cgi.di"); break;
+        	  	  	  case 17: strcpy(lCommand,"cgi.di"); break;
+        	  	  	  case 22: strcpy(lCommand,"cgi.di"); break;
+        	  	  	  case 23: strcpy(lCommand,"cgi.di"); break;
+        	  	  	  case 24: strcpy(lCommand,"cgi.di"); break;
+        	  	  	  case 25: strcpy(lCommand,"cgi.di"); break;
+        	  	  	  case 26: strcpy(lCommand,"cgi.di"); break;
+        	  	  	  case 27: strcpy(lCommand,"cgi.di"); break;
+        	  	  	  case 28: strcpy(lCommand,"cgi.di"); break;
         	  	  	  default: break;
 	        	  }
 	        	  break;
 	          case 7: strcpy(strType,"mbd:"); break;
     	      default: sprintf(strType,"?%d?:",type);  break;
+    	  }
+    	  if (strstr(lCommand,"cgi")) {
+    		  switch (target_size) {
+    		  case 1:
+    			  entry_size = 1;
+    			  break;
+    		  case 2:
+    			  entry_size = 2;
+    			  break;
+    		  case 3:
+    			  entry_size = 4;
+    			  break;
+    		  case 4:
+    			  entry_size = 8;
+    			  break;
+    		  case 5:
+    		  default:
+    			  entry_size = 16;
+    			  break;
+    		  }
+        	  instrName = lCommand;
+              write_instr_name();
+              FIELD_C_AC16();
+              FIELD_B_AC16();
+              if ((c == 0) && (ps == 0)) {//subOpcode
+            	  strcat(formatString,"%r,%r,[%s%r],%d,0x%x");
+            	  my_sprintf(state, state->operandBuffer, formatString, fieldB, fieldB, strType, fieldC, entry_size, subOpcode);
+              }
+              else if ((c == 0) && (ps == 1)) {
+            	  strcat(formatString,"%r,[%s%r],%d,0x%x");
+            	  my_sprintf(state, state->operandBuffer, formatString, fieldB, strType, fieldC, entry_size, subOpcode);
+              }
+              else if ((c == 1) && (ps == 0)) {
+            	  strcat(formatString,"%r,%r,[cm:GPA2],[%s%r],%d,0x%x");
+            	  my_sprintf(state, state->operandBuffer, formatString, fieldB, fieldB, strType, fieldC, entry_size, subOpcode);
+              }
+              else { //(c == 1) && (ps == 1)
+            	  strcat(formatString,"%r,[cm:GPA2],[%s%r],%d,0x%x");
+            	  my_sprintf(state, state->operandBuffer, formatString, fieldB, strType, fieldC, entry_size, subOpcode);
+              }
+    		  break;
     	  }
     	  if (di != 0) strcat(lCommand,".di");
     	  instrName = lCommand;
@@ -6936,8 +7137,8 @@ dsmOneArcInst (bfd_vma addr, struct arcDisState *state, disassemble_info * info)
                 	  if (c == 0) {
                 		  switch ( subOpcode ) {
                 		  case 3:
-                    		  strcat(formatString,"%r,%r,[%s%r],%r");
-                    		  my_sprintf(state, state->operandBuffer, formatString, fieldB, fieldB, strType, fieldC, fieldB);
+                				  strcat(formatString,"%r,%r,[%s%r]");
+                				  my_sprintf(state, state->operandBuffer, formatString, fieldB, fieldB, strType, fieldC);
                 			  break;
                 		  default:
                 			  if ((subOpcode == 2) && (c == 0) && (type == 6)) {
@@ -6945,8 +7146,14 @@ dsmOneArcInst (bfd_vma addr, struct arcDisState *state, disassemble_info * info)
                 				  my_sprintf(state, state->operandBuffer, formatString, fieldB, fieldB, strType, fieldC, fieldB);
                 			  }
                 			  else {
-                				  strcat(formatString,"%r,%r,[%s%r]");
-                				  my_sprintf(state, state->operandBuffer, formatString, fieldB, fieldB, strType, fieldC);
+                				  if (subOpcode == 16) { //atst
+                					  strcat(formatString,"%r,[%s%r]");
+                					  my_sprintf(state, state->operandBuffer, formatString, fieldB, strType, fieldC);
+                				  }
+                				  else {
+                					  strcat(formatString,"%r,%r,[%s%r]");
+                					  my_sprintf(state, state->operandBuffer, formatString, fieldB, fieldB, strType, fieldC);
+                				  }
                 			  }
                 			  break;
                 		  }
@@ -6973,8 +7180,14 @@ dsmOneArcInst (bfd_vma addr, struct arcDisState *state, disassemble_info * info)
                     		  }
                     		  break;
                     	  default:
-                    		  strcat(formatString,"%r,[%s%r]");
-                    		  my_sprintf(state, state->operandBuffer, formatString, fieldB, strType, fieldC);
+                    		  if (subOpcode == 16) {//atst
+                    			  strcat(formatString,"[%s%r]");
+                    			  my_sprintf(state, state->operandBuffer, formatString, strType, fieldC);
+                    		  }
+                    		  else {
+                    			  strcat(formatString,"%r,[%s%r]");
+                    			  my_sprintf(state, state->operandBuffer, formatString, fieldB, strType, fieldC);
+                    		  }
                     		  break;
                     	  }
                 	  }
@@ -7170,11 +7383,25 @@ dsmOneArcInst (bfd_vma addr, struct arcDisState *state, disassemble_info * info)
       	  		  else {
 	                     if ( ps == 0 ) {
 	                    	 if (subOpcode == 17){
-	                    		 if ((type == 0) || (type == 7))
-	                    			 strcat(formatString,"%r,[cm:GPA2],[%s%r]");
+	                    		 if ((type == 0) || (type == 7)) {
+	                    			 if (!c) {
+	                    				 strcat(formatString,"%r,[%s%r]");
+	                    				 my_sprintf(state, state->operandBuffer, formatString, fieldB, strType, fieldC);
+	                    			 }
+	                    			 else {
+	                    				 strcat(formatString,"%r,[cm:GPA2],[%s%r]");
+	                    				 my_sprintf(state, state->operandBuffer, formatString, fieldB, strType, fieldC);
+	                    			 }
+	                    		 }
 	                    		 else
-	                    			 strcat(formatString,"%r,[cm:GPA1],[%s%r]");
-	                          	  my_sprintf(state, state->operandBuffer, formatString, fieldB, strType, fieldC);
+	                    			 if (c) {
+	                    				 strcat(formatString,"%r,[cm:GPA1],[%s%r]");
+	                    				 my_sprintf(state, state->operandBuffer, formatString, fieldB, strType, fieldC);
+	                    			 }
+	                    			 else {
+	                    				 strcat(formatString,"%r,[%s%r]");
+	                    				 my_sprintf(state, state->operandBuffer, formatString, fieldB, strType, fieldC);
+	                    			 }
         	            	 }
                 	    	 else {
                       			  strcat(formatString,"%r,[%s%r]");
@@ -7205,11 +7432,17 @@ dsmOneArcInst (bfd_vma addr, struct arcDisState *state, disassemble_info * info)
                 	  if (((type == 0) || (type == 7)) && (c == 1))
                 			  strcat(formatString,"%r,[cm:GPA2],[%s%r]");
                 	  else {
-                		  if (((subOpcode == 22) || (subOpcode == 21)) && (c == 0))
+                		  if (((subOpcode == 22) || (subOpcode == 21) || (subOpcode == 20)) && (c == 0))
                 			  strcat(formatString,"%r,[%s%r]");
-                		  else
-                			  strcat(formatString,"%r,[cm:GPA1],[%s%r]");
-                	  	  }
+                		  else {
+                			  if (((subOpcode == 18) || (subOpcode == 19)) && (!c)) {
+                				  strcat(formatString,"%r,[%s%r]");
+                			  }
+                			  else {
+                				  strcat(formatString,"%r,[cm:GPA1],[%s%r]");
+                			  }
+                		  }
+                	  }
                 	  my_sprintf(state, state->operandBuffer, formatString, fieldB, strType, fieldC);
                   }
                   else {
@@ -7988,6 +8221,9 @@ dsmOneArcInst (bfd_vma addr, struct arcDisState *state, disassemble_info * info)
     	  entry_size_val = es ? (16 << ((limm_value >> 20) & 0x7)) : fieldC;
     	  size_val = ss ? ((limm_value >> 0) & 0x3ff) : fieldC;
 
+    	  if (ss && (size_val == 0))
+    		  size_val = 256;
+
       	  instrName = name;
       	  write_instr_name();
       	  WRITE_FORMAT_x(A);
@@ -8006,6 +8242,12 @@ dsmOneArcInst (bfd_vma addr, struct arcDisState *state, disassemble_info * info)
           		  my_sprintf(state, state->operandBuffer, formatString, fieldA, srcStr, fieldB, entry_size_val, offset_val, fieldC, dstStr, fieldB, size_val);
       	  }
       	  else {
+      		  if ((subop2 == 4) && ss) {
+     			  offset_val = os ? ((limm_value >> 8) & 0xff) : fieldC;
+     			  size_val = ss ? ((limm_value >> 0) & 0xff) : fieldC;
+      			  if (size_val == 0)
+      					  size_val = 256;
+      		  }
           	  strcat(formatString,",[%s:%r]");
           	  strcat(formatString,",[%s:%r");
           	  strcat(formatString,es ? ",%d" : ",%r");
@@ -8054,8 +8296,8 @@ dsmOneArcInst (bfd_vma addr, struct arcDisState *state, disassemble_info * info)
        	mcris = (limm_value & 0x8) >> 3;
        	ersis = (limm_value & 0x10) >> 4;
        	oris = (limm_value & 0x20) >> 5;
-       	entry_size_val =  ((limm_value & 0x3f00) >> 8) << 3;
-       	offset_val = (limm_value & 0x3ff0000) >> 16;
+       	entry_size_val =  ((limm_value & 0x1ff00) >> 8);
+       	offset_val = ((limm_value & 0xf000000) >> 24) << 4;
        	mntCode = (limm_value & 0xf0000000) >> 28;
        	write_instr_name();
        	WRITE_FORMAT_x(A);
@@ -8132,6 +8374,8 @@ dsmOneArcInst (bfd_vma addr, struct arcDisState *state, disassemble_info * info)
     }
     break;
    }
+  case 88:
+	  break;
 #endif // #ifdef ARC_NPS_CMDS
 
   default:
