@@ -1,3 +1,74 @@
+2015-05-18  Roy Vardi  <royv@ezchip.com>
+
+* arcompact-dis.c: Remove xexb,xexw support. Leave only xex
+
+2014-12-8  Roy Vardi  <royv@ezchip.com>
+
+* arcompact-dis.c: Allow entry size 256 and code it as 0
+
+2014-11-17  Roy Vardi  <royv@ezchip.com>
+
+* arcompact-dis.c: Change max value for entry size to 256
+
+2014-11-06  Roy Vardi  <royv@ezchip.com>
+
+* arcompact-dis.c: Fix broken disassembly
+
+2014-10-19  Roy Vardi  <royv@ezchip.com>
+
+* arcompact-dis.c: new formats for schd command: ie1,ie2,ie12 (interrupt enable)
+
+2014-10-01  Roy Vardi  <royv@ezchip.com>
+
+* arcompact-dis.c: Remove idxbgt instruction
+2014-10-01  Roy Vardi  <royv@ezchip.com>
+
+* arcompact-dis.c: Update mmnt limm fields according to ACC 3.4
+
+2014-10-01  Roy Vardi  <royv@ezchip.com>
+
+* arcompact-dis.c: Fix dma cp instruction disassembly
+
+2014-10-01  Roy Vardi  <royv@ezchip.com>
+
+* arcompact-dis.c: Update mmnt limm fields according to ACC 3.4
+
+2014-10-01  Roy Vardi  <royv@ezchip.com>
+
+* arcompact-dis.c: Fix dma instruction decoding
+
+2014-9-30  Roy Vardi  <royv@ezchip.com>
+
+* arcompact-dis.c: Fix dma cp instruction disassembly
+
+2014-9-29  Roy Vardi  <royv@ezchip.com>
+
+* arcompact-dis.c: Fix dma instruction which is decoded wrong
+
+2014-9-29  Roy Vardi  <royv@ezchip.com>
+
+* arcompact-dis.c: Fix dma cp instruction decoding for specific format
+
+2014-9-29  Roy Vardi  <royv@ezchip.com>
+
+* arcompact-dis.c: Fix dma cp instruction decoding
+
+2014-8-31  Roy Vardi  <royv@ezchip.com>
+
+* arcompact-dis.c: Add new cgi instruction, counter generic encapsulated instruction operations
+
+2014-8-28  Roy Vardi  <royv@ezchip.com>
+
+* arcompact-dis.c: adadd{ l} virtual addresses target size changes
+
+2014-8-20  Roy Vardi  <royv@ezchip.com>
+
+* arcompact-dis.c: Remove old aric.r virtual format, add new one
+
+2014-8-7  Roy Vardi  <royv@ezchip.com>
+
+* arcompact-dis.c: Add format to bdfre, add m flag
+
 2014-6-16  Roy Vardi  <royv@ezchip.com>
 
 * arcompact-dis.c: Fix offset in cp csd type
