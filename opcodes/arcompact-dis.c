@@ -5574,6 +5574,7 @@ dsmOneArcInst (bfd_vma addr, struct arcDisState *state, disassemble_info * info)
     {
     	int ib;
     	int c;
+    	int m;
        	int num2;
        	int num3;
        	int num4;
@@ -5632,6 +5633,8 @@ dsmOneArcInst (bfd_vma addr, struct arcDisState *state, disassemble_info * info)
       	        num4 = BITS(state->words[0],6,9);
        	        num6 = BITS(state->words[0],6,11);
        	        numOfJobs = BITS(state->words[0],6,8);
+       	        ib = BITS(state->words[0],10,10);
+       	        m = BITS(state->words[0],11,11);
        	        if (numOfJobs == 0) numOfJobs = 8;
     	        if ( num2 == 0 )  num2 = 4;
     	        if ( num3 == 0 )  num3 = 8;
@@ -5662,8 +5665,14 @@ dsmOneArcInst (bfd_vma addr, struct arcDisState *state, disassemble_info * info)
     	        	break;
     	        case 0x28:
     	        case 0x11:
-   	        	    strcat(formatString,",[cm:%r],%r,%d");
-   	        	    my_sprintf(state, state->operandBuffer, formatString, fieldA, fieldB, fieldB, num3);
+    	        	if (m == 1) {
+    	        		strcat(formatString,",[cm:%r],%r,%d,%d");
+    	        		my_sprintf(state, state->operandBuffer, formatString, fieldA, fieldB, fieldB, ib, num3);
+    	        	}
+    	        	else {
+    	        		strcat(formatString,",[cm:%r],%r,%d");
+    	        		my_sprintf(state, state->operandBuffer, formatString, fieldA, fieldB, fieldB, num3);
+    	        	}
        	        	break;
     	        case 0x1C:
     	        case 0x1D:
