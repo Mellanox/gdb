@@ -162,6 +162,99 @@ static int arc_regmap[] =
 };
 
 /* -------------------------------------------------------------------------- */
+/*				  Data types				      */
+/* -------------------------------------------------------------------------- */
+
+#ifdef ARC_LEGACY_PTRACE_ABI
+/*! Register data structure.
+
+    This struct matches the sequence returned by ptrace.
+
+    The meaning of orig_r0 is lost in the mists of time. orig_r8 tells you
+    what stop_pc, status32 and ret really refer to, but is dropped in ABI v3
+    and so not used here. */
+struct user_regs_struct {
+
+  struct pt_regs  scratch;
+  struct callee_regs  callee;
+  long int efa;		/* break pt addr, for break points in delay slots */
+  long int stop_pc;	/* give dbg stop_pc directly after checking orig_r8 */
+};
+#endif
+
+/* Debug registers change state */
+enum dr_changed_state
+  {
+    dr_unchanged    = 0,
+    dr_changed      = 1,
+    dr_new_thread   = 2,
+  };
+
+#if __BYTE_ORDER == __BIG_ENDIAN
+#define DR_TYPE_SHIFT 4
+#define DR_LEN_SHIFT  24
+#else
+#define DR_TYPE_SHIFT 26
+#define DR_LEN_SHIFT  0
+#endif
+
+/* Watchpoint/breakpoint read/write values in control register.
+   The left shift is according to the control structure */
+#define DR_TYPE_EXECUTE (0x0 << DR_TYPE_SHIFT)	/* Break on instruction execution. */
+#define DR_TYPE_WRITE   (0x1 << DR_TYPE_SHIFT)	/* Break on data writes. */
+#define DR_TYPE_READ    (0x2 << DR_TYPE_SHIFT)	/* Break on data reads. */
+#define DR_TYPE_ACCESS  (0x3 << DR_TYPE_SHIFT)	/* Break on data reads or writes. */
+
+/* Watchpoint/breakpoint length fields in control register.
+   The left shift is according to the control structure  */
+#define DR_LEN_1        (0x1 << DR_LEN_SHIFT) /* 1-byte.	*/
+#define DR_LEN_2        (0x2 << DR_LEN_SHIFT) /* 2-byte.  */
+#define DR_LEN_4        (0x4 << DR_LEN_SHIFT) /* 4-byte.  */
+#define DR_LEN_8        (0x8 << DR_LEN_SHIFT) /* 8-byte.  */
+
+/* Since we cannot dynamically allocate subfields of arch_process_info,
+   assume a maximum number of supported break-/watchpoints.  */
+#define ARC_MAX_HBP_SLOTS 8
+
+/* A macro to loop over all debug registers.  */
+#define ALL_DEBUG_REGISTERS(i) for (i = 0; i < ARC_MAX_HBP_SLOTS; i++)
+
+/* The I'th debug register is vacant if its Debug Control
+ * register is reset.  */
+#define ARC_DR_VACANT(state, i) (state->control[i] == 0)
+
+/* Structure used to keep track of hardware break-/watch-points.  */
+struct arc_debug_reg_state
+{
+  /* Address to break on, or being watched.  */
+  unsigned int address[ARC_MAX_HBP_SLOTS];
+  /* Control register for break-/watch- point.  */
+  unsigned int control[ARC_MAX_HBP_SLOTS];
+  /* Reference counts for each debug register.  */
+  int ref_count[ARC_MAX_HBP_SLOTS];
+};
+
+/* Per-process arch-specific data we want to keep.  */
+struct arch_process_info
+{
+  struct arc_debug_reg_state debug_reg_state;
+};
+
+/* Per-thread arch-specific data we want to keep.  */
+struct arch_lwp_info
+{
+  /* Non-zero if our copy differs from what's recorded in the thread.  */
+  enum dr_changed_state debug_register_changed[ARC_MAX_HBP_SLOTS];
+  /* Cached stopped data address.  */
+  CORE_ADDR stopped_data_address;
+};
+
+/* -------------------------------------------------------------------------- */
+/*		    Static variables global to this file.		      */
+/* -------------------------------------------------------------------------- */
+
+
+/* -------------------------------------------------------------------------- */
 /*			Externally defined functions.			      */
 /* -------------------------------------------------------------------------- */
 
@@ -267,6 +360,50 @@ arc_set_pc (struct regcache *regcache, CORE_ADDR pc)
 
 }	/* arc_set_pc () */
 
+/* Clear the reference counts and forget everything we knew about the
+   debug registers.  */
+void
+arc_low_init_dregs (struct arc_debug_reg_state *state)
+{
+  int i;
+
+  ALL_DEBUG_REGISTERS (i)
+  {
+    state->address[i] = 0;
+    state->control[i] = 0;
+    state->ref_count[i] = 0;
+  }
+}
+
+/* Called when a new process is created.  */
+
+static struct arch_process_info *
+arc_new_process (void)
+{
+  struct arch_process_info *info = xcalloc (1, sizeof (*info));
+
+  arc_low_init_dregs (&info->debug_reg_state);
+
+  return info;
+}
+
+/* Called when a new thread is detected.  */
+
+static struct arch_lwp_info *
+arc_new_thread (void)
+{
+  int i;
+  struct arch_lwp_info *info = xcalloc (1, sizeof (*info));
+
+  ALL_DEBUG_REGISTERS(i)
+  {
+    /* mark changed status differently so it can be ignored
+     for zero referenced slots */
+    info->debug_register_changed[i] = dr_new_thread;
+  }
+
+  return info;
+}
 
 /*! Determine if we have a breakpoint at an address.
 
@@ -289,6 +426,378 @@ arc_breakpoint_at (CORE_ADDR where)
 
 }	/* arc_breakpoint_at () */
 
+#define Z_PACKET_HBP_EXECUTE	'1'
+#define Z_PACKET_HBP_WRITE	'2'
+#define Z_PACKET_HBP_READ	'3'
+#define Z_PACKET_HBP_ACCESS	'4'
+
+/* Map the protocol hw breakpoint type TYPE to enum target_hw_bp_type.  */
+static enum target_hw_bp_type Z_packet_to_hw_type (char type)
+{
+  switch (type) {
+  case Z_PACKET_HBP_EXECUTE:
+    return hw_execute;
+  case Z_PACKET_HBP_WRITE:
+    return hw_write;
+  case Z_PACKET_HBP_READ:
+    return hw_read;
+  case Z_PACKET_HBP_ACCESS:
+    return hw_access;
+  default:
+    error ("Z_packet_to_hw_type: bad watchpoint type %c", type);
+  }
+}
+
+static unsigned
+arc_length_and_rw_bits (int len, enum target_hw_bp_type type)
+{
+  unsigned rw;
+
+  switch (type) {
+  case hw_write:
+    rw = DR_TYPE_WRITE;
+    break;
+  case hw_read:
+    rw = DR_TYPE_READ;
+    break;
+  case hw_access:
+    rw = DR_TYPE_ACCESS;
+    break;
+  case hw_execute:
+    rw = DR_TYPE_EXECUTE;
+    break;
+  default:
+    error ("\
+Invalid hardware breakpoint type %d in arc_length_and_rw_bits.\n", (int) type);
+  }
+
+  switch (len) {
+  case 1:
+    rw = (DR_LEN_1 | rw);
+    break;
+  case 2:
+    rw = (DR_LEN_2 | rw);
+    break;
+  case 4:
+    rw = (DR_LEN_4 | rw);
+    break;
+  case 8:
+    rw = (DR_LEN_8 | rw);
+    break;
+  default:
+    error ("\
+Invalid hardware breakpoint len %d in arc_length_and_rw_bits.\n", (int) len);
+  }
+
+  return rw;
+}
+
+/* Insert a hw breakpoint at address ADDR, which is assumed to be aligned
+   according to the length of the region to watch. Return 0 on
+   success, -1 on failure.  */
+static int
+arc_insert_aligned_hbp (struct arc_debug_reg_state *state,
+                        CORE_ADDR addr, unsigned len_rw_bits)
+{
+  int i;
+
+  /* First, look for an occupied debug register with the same address
+     and the same RW and LEN definitions.  If we find one, we can
+     reuse it for this hw breakpoint as well (and save a register).  */
+  ALL_DEBUG_REGISTERS (i)
+  {
+    if (!ARC_DR_VACANT (state, i)
+        && state->address[i] == addr
+        && (state->control[i] == len_rw_bits))
+    {
+      state->ref_count[i]++;
+      return 0;
+    }
+  }
+
+  /* Next, look for a vacant debug register.  */
+  ALL_DEBUG_REGISTERS (i)
+  {
+    if (ARC_DR_VACANT (state, i))
+      break;
+  }
+
+  /* No more debug registers!  */
+  if (i >= ARC_MAX_HBP_SLOTS)
+    return -1;
+
+  /* Now set up the register I to watch our region.  */
+  state->address[i] = addr;
+  state->ref_count[i] = 1;
+  state->control[i] = len_rw_bits;
+
+  return 0;
+}
+
+static int
+update_debug_registers_callback (struct inferior_list_entry *entry,
+                                 void *regnum)
+{
+  struct thread_info *thr = (struct thread_info *) entry;
+  struct lwp_info *lwp = get_thread_lwp (thr);
+  int pid = pid_of (current_thread);
+  int i = *(int*)regnum;
+
+  /* Only update the threads of this process.  */
+  if (pid_of (thr) == pid)
+  {
+    /* The actual update is done later just before resuming the lwp,
+       we just mark that the registers need updating.  */
+    lwp->arch_private->debug_register_changed[i] = dr_changed;
+
+    /* If the lwp isn't stopped, force it to momentarily pause, so
+       we can update its debug registers.  */
+    if (!lwp->stopped)
+      linux_stop_lwp (lwp);
+  }
+
+  return 0;
+}
+
+/* Update the inferior's debug register REGNUM from STATE.  */
+void
+arc_dr_low_set (const struct arc_debug_reg_state *state, int regnum)
+{
+  if (! (regnum >= 0 && regnum <= ARC_MAX_HBP_SLOTS))
+    error ("Invalid debug register %d", regnum);
+
+  find_inferior (&all_threads, update_debug_registers_callback, &regnum);
+}
+
+/* Update the inferior debug registers state, in INF_STATE, with the
+   new debug registers state, in NEW_STATE.  */
+static void
+arc_update_inferior_debug_regs (struct arc_debug_reg_state *inf_state,
+                                struct arc_debug_reg_state *new_state)
+{
+  int i;
+  ALL_DEBUG_REGISTERS (i)
+  {
+    if (ARC_DR_VACANT (new_state, i) != ARC_DR_VACANT (inf_state, i))
+    {
+      arc_dr_low_set (new_state, i);
+    }
+    else
+    {
+      gdb_assert (new_state->address[i] == inf_state->address[i]);
+      gdb_assert (new_state->control[i] == inf_state->control[i]);
+    }
+  }
+
+  *inf_state = *new_state;
+}
+
+/* Insert a hw breakpoint.  Return 0 on success, -1 on failure.  */
+static int arc_low_insert_hbp (struct arc_debug_reg_state *state,
+                               char type_from_packet, CORE_ADDR addr, int len)
+{
+  int retval;
+  enum target_hw_bp_type type = Z_packet_to_hw_type (type_from_packet);
+  /* Work on a local copy of the debug registers, and on success,
+     commit the change back to the inferior.  */
+  struct arc_debug_reg_state local_state = *state;
+
+  if ((len != 1 && len != 2 && len != 4) || addr % len != 0)
+    return -1; /* nonaligned */
+  else
+  {
+    unsigned len_rw = arc_length_and_rw_bits (len, type);
+    retval = arc_insert_aligned_hbp (&local_state, addr, len_rw);
+  }
+
+  if (retval == 0)
+    arc_update_inferior_debug_regs (state, &local_state);
+
+  return retval;
+}
+
+/* Breakpoint/Watchpoint support.  */
+static int
+arc_insert_point (enum raw_bkpt_type type, CORE_ADDR addr,
+                  int len, struct raw_breakpoint *bp)
+{
+  struct process_info *proc = current_process ();
+
+  switch (type)
+  {
+  case raw_bkpt_type_hw:
+  case raw_bkpt_type_write_wp:
+  case raw_bkpt_type_read_wp:
+  case raw_bkpt_type_access_wp:
+    return arc_low_insert_hbp (&proc->private->arch_private->debug_reg_state,
+                               type, addr, len);
+  default:
+    /* Unsupported.  */
+    return 1;
+  }
+}
+
+static void
+arc_dr_set (ptid_t ptid, int regnum, unsigned long addr, unsigned long ctrl)
+{
+  int tid;
+
+  tid = ptid_get_lwp (ptid);
+
+  if (ctrl) /* set address only if ctrl is initialized */
+  {
+    errno = 0;
+    ptrace (PTRACE_POKEUSER, tid,
+            offsetof (struct user, u_dr_value[regnum]), addr);
+    if (errno != 0)
+      error ("Couldn't write debug register value");
+  }
+
+  errno = 0;
+  ptrace (PTRACE_POKEUSER, tid,
+          offsetof (struct user, u_dr_control[regnum]), ctrl);
+  if (errno != 0)
+    error ("Couldn't write debug register control");
+}
+
+/* Called when resuming a thread.
+   If the debug regs have changed, update the thread's copies.  */
+static void
+arc_prepare_to_resume (struct lwp_info *lwp)
+{
+  ptid_t ptid = ptid_of (get_lwp_thread (lwp));
+  int i;
+  int pid = ptid_get_pid (ptid);
+  struct process_info *proc = find_process_pid (pid);
+  struct arc_debug_reg_state *state =
+                   &proc->private->arch_private->debug_reg_state;
+
+  ALL_DEBUG_REGISTERS (i)
+  {
+    if (lwp->arch_private->debug_register_changed[i])
+    {
+      if (lwp->arch_private->debug_register_changed[i] == dr_changed ||
+         (lwp->arch_private->debug_register_changed[i] == dr_new_thread &&
+          state->ref_count[i] > 0))
+        arc_dr_set (ptid, i, state->address[i], state->control[i]);
+
+      lwp->arch_private->debug_register_changed[i] = dr_unchanged;
+    }
+  }
+
+}
+
+/* Remove a hw breakpoint at address ADDR, which is assumed to be aligned
+   according to the length of the region to watch. Return 0 on
+   success, -1 on failure.  */
+static int
+arc_remove_aligned_hbp (struct arc_debug_reg_state *state,
+                        CORE_ADDR addr, unsigned len_rw_bits)
+{
+  int i, retval = -1;
+
+  ALL_DEBUG_REGISTERS (i)
+  {
+    if (!ARC_DR_VACANT (state, i)
+        && state->address[i] == addr
+        && (state->control[i] == len_rw_bits))
+    {
+      if (--state->ref_count[i] == 0) /* No longer in use?  */
+      {
+        /* Reset */
+        state->address[i] = 0;
+        state->control[i] = 0;
+      }
+      retval = 0;
+    }
+  }
+
+  return retval;
+}
+
+/* Remove a hw breakpoint that watched the memory region which starts at
+   address ADDR, whose length is LEN bytes, and for accesses of the
+   type TYPE_FROM_PACKET.  Return 0 on success, -1 on failure.  */
+
+int
+arc_low_remove_hbp (struct arc_debug_reg_state *state,
+                    char type_from_packet, CORE_ADDR addr, int len)
+{
+  int retval;
+  enum target_hw_bp_type type = Z_packet_to_hw_type (type_from_packet);
+  /* Work on a local copy of the debug registers, and on success,
+     commit the change back to the inferior.  */
+  struct arc_debug_reg_state local_state = *state;
+  unsigned len_rw = arc_length_and_rw_bits (len, type);
+
+  retval = arc_remove_aligned_hbp (&local_state, addr, len_rw);
+
+  if (retval == 0)
+    arc_update_inferior_debug_regs (state, &local_state);
+
+  return retval;
+}
+
+/* Breakpoint/Watchpoint support.  */
+static int
+arc_remove_point (enum raw_bkpt_type type, CORE_ADDR addr,
+                  int len, struct raw_breakpoint *bp)
+{
+  struct process_info *proc = current_process ();
+
+  switch (type)
+  {
+  case raw_bkpt_type_hw:
+  case raw_bkpt_type_write_wp:
+  case raw_bkpt_type_read_wp:
+  case raw_bkpt_type_access_wp:
+    return arc_low_remove_hbp (&proc->private->arch_private->debug_reg_state,
+                               type, addr, len);
+  default:
+    /* Unsupported.  */
+    return 1;
+  }
+}
+
+/* Return whether current thread is stopped due to a watchpoint.  */
+static int
+arc_stopped_by_watchpoint (void)
+{
+  struct lwp_info *lwp = get_thread_lwp (current_thread);
+  siginfo_t siginfo;
+
+  /* Retrieve siginfo.  */
+  errno = 0;
+  ptrace (PTRACE_GETSIGINFO, lwpid_of (current_thread), 0, &siginfo);
+  if (errno != 0)
+    return 0;
+
+  /* This must be a hardware breakpoint.  */
+  if (siginfo.si_signo != SIGTRAP
+      || (siginfo.si_code & 0xffff) != 0x0004 /* TRAP_HWBKPT */)
+    return 0;
+
+  /* If we are in a negative slot then we're looking at a breakpoint and not
+       a watchpoint.  */
+  if (siginfo.si_errno <= 0)
+    return 0;
+
+  /* Cache stopped data address for use by arc_stopped_data_address.  */
+  lwp->arch_private->stopped_data_address
+    = (CORE_ADDR) (uintptr_t) siginfo.si_addr;
+
+  return 1;
+}
+
+/* Return data address that triggered watchpoint.  Called only if
+   arc_stopped_by_watchpoint returned true.  */
+static CORE_ADDR
+arc_stopped_data_address (void)
+{
+  struct lwp_info *lwp = get_thread_lwp (current_thread);
+
+  return lwp->arch_private->stopped_data_address;
+}
 
 /* -------------------------------------------------------------------------- */
 /*			Register set access functions.			      */
@@ -571,16 +1080,16 @@ struct linux_target_ops the_low_target = {
   .breakpoint_reinsert_addr         = NULL,
   .decr_pc_after_break              = 0,
   .breakpoint_at                    = arc_breakpoint_at,
-  .insert_point                     = NULL,
-  .remove_point                     = NULL,
-  .stopped_by_watchpoint            = NULL,
-  .stopped_data_address             = NULL,
+  .insert_point                     = arc_insert_point,
+  .remove_point                     = arc_remove_point,
+  .stopped_by_watchpoint            = arc_stopped_by_watchpoint,
+  .stopped_data_address             = arc_stopped_data_address,
   .collect_ptrace_register          = NULL,
   .supply_ptrace_register           = NULL,
   .siginfo_fixup                    = NULL,
-  .new_process                      = NULL,
-  .new_thread                       = NULL,
-  .prepare_to_resume                = NULL,
+  .new_process                      = arc_new_process,
+  .new_thread                       = arc_new_thread,
+  .prepare_to_resume                = arc_prepare_to_resume,
   .process_qsupported               = NULL,
   .supports_tracepoints             = NULL,
   .get_thread_area                  = NULL,
