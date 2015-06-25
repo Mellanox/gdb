@@ -123,5 +123,8 @@ initialize_tdesc_compatible_arcompact (void)
   tdesc_create_reg (feature, "aux_irq_pulse_cancel", 85, 1, "", 32, "int");
   tdesc_create_reg (feature, "aux_irq_pending", 86, 1, "", 32, "int");
 
+  tdesc_create_reg (feature, "eflags", 87, 1, "", 32, "int");
+  tdesc_create_reg (feature, "gpa1", 88, 1, "", 32, "int");
+
   tdesc_compatible_arcompact = result;
 }

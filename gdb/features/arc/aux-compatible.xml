@@ -36,4 +36,6 @@
  <reg name="bta_l2"       bitsize="32" group="" type="code_ptr"/>
  <reg name="aux_irq_pulse_cancel" bitsize="32" group=""/>
  <reg name="aux_irq_pending"      bitsize="32" group=""/>
+ <reg name="eflags"       bitsize="32" group=""/>
+ <reg name="gpa1"         bitsize="32" group=""/>
 </feature>

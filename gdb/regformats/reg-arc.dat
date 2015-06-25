@@ -95,3 +95,5 @@ expedite:fp,sp,eret
 32:bta_l2
 32:aux_irq_pulse_cancel
 32:aux_irq_pending
+32:gpa1
+32:eflags

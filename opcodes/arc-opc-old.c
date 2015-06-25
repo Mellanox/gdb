@@ -4335,8 +4335,13 @@ static const struct arc_operand_value arc_reg_names_a700[] =
   {"MINMAX_BUILD",0x7E,AUXREG_AC, ARC_REGISTER_READONLY},
   /* BCR for barrel shifter */
   {"barrel_build",0x7F,AUXREG_AC, ARC_REGISTER_READONLY},
-  {"BARREL_BUILD",0x7F,AUXREG_AC, ARC_REGISTER_READONLY}
+  {"BARREL_BUILD",0x7F,AUXREG_AC, ARC_REGISTER_READONLY},
 
+  /* EZchip */
+  {"eflags",0xFFFFF880,AUXREG_AC, ARC_REGISTER_READONLY},
+  {"EFLAGS",0xFFFFF880,AUXREG_AC, ARC_REGISTER_READONLY},
+  {"gpa1",0xFFFFF88C,AUXREG_AC, ARC_REGISTER_READONLY},
+  {"GPA1",0xFFFFF88C,AUXREG_AC, ARC_REGISTER_READONLY},
 };
 
 static const struct arc_operand_value arc_reg_names_em[] =

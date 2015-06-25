@@ -437,6 +437,8 @@ static const struct arc_reginfo const aux_compatible_reginfo[] =
   {"bta_l2",               TRUE, TRUE, FALSE, FALSE},
   {"aux_irq_pulse_cancel", FALSE,TRUE, FALSE, FALSE},
   {"aux_irq_pending",      TRUE, FALSE,FALSE, FALSE},
+  {"eflags",               TRUE, TRUE, FALSE, FALSE},
+  {"gpa1",                 TRUE, TRUE, FALSE, FALSE},
 };
 
 /* -------------------------------------------------------------------------- */
