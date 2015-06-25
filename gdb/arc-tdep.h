@@ -471,8 +471,10 @@
 #define ARC_AUX_BTA_REGNUM                   82	/*!< Access __RW__ */
 #define ARC_AUX_BTA_L1_REGNUM                83	/*!< Access __RW_ */
 #define ARC_AUX_BTA_L2_REGNUM                84	/*!< Access __RW_ */
-#define ARC_AUX_AUX_IRQ_PULSE_CANCEL_REGNUM  85 /*!< Access __RW_ */
-#define ARC_AUX_AUX_IRQ_PENDING_REGNUM       86	/*!< Access __RW_ */
+#define ARC_AUX_BTA_GPA1_REGNUM              85	/*!< Access __RW_ */
+#define ARC_AUX_BTA_EFLAGS_REGNUM            86	/*!< Access __RW_ */
+#define ARC_AUX_AUX_IRQ_PULSE_CANCEL_REGNUM  87 /*!< Access __RW_ */
+#define ARC_AUX_AUX_IRQ_PENDING_REGNUM       88	/*!< Access __RW_ */
 
 /* Some useful counts. */
 

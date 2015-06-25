@@ -1487,6 +1487,7 @@ arc_register_name (struct gdbarch *gdbarch, int regnum)
     "eret",            "erbta",           "erstatus",        "ecr",
     "efa",             "icause1",         "icause2",         "aux_ienable",
     "aux_itrigger",    "bta",             "bta_l1",          "bta_l2",
+    "gpa1",            "eflags",
     "aux_irq_pulse_cancel",               "aux_irq_pending"
   };
 

@@ -840,6 +840,8 @@ arc_fill_gregset (struct regcache *regcache, void *buf)
   /* bta not currently supported. */
   /* bta_l1 not currently supported. */
   /* bta_l2 not currently supported. */
+  collect_register_by_name (regcache, "gpa1", &(regbuf->scratch.gpa1));
+  collect_register_by_name (regcache, "eflags", &(regbuf->scratch.eflags));
   /* aux_irq_pulse_cancel not currently supported. */
   /* aux_irq_pending not currently supported. */
 
@@ -924,6 +926,8 @@ arc_store_gregset (struct regcache *regcache, const void *buf)
   /* bta not currently supported. */
   /* bta_l1 not currently supported. */
   /* bta_l2 not currently supported. */
+  supply_register_by_name (regcache, "gpa1", &(regbuf->scratch.gpa1));
+  supply_register_by_name (regcache, "eflags", &(regbuf->scratch.eflags));
   /* aux_irq_pulse_cancel not currently supported. */
   /* aux_irq_pending not currently supported. */
 
