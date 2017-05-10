@@ -969,23 +969,21 @@ arc_is_in_prologue (struct gdbarch *gdbarch,
 		      return TRUE;
 		    }
 		}
-	      else
-		{
-		  if (arc_insn_operand_is_reg (insn, 0))
-		    {
-		      /* st.a <reg>, [sp,<offset>] */
 
-		      if (arc_is_callee_saved (gdbarch,
-				    arc_insn_get_operand_reg (insn, 0),
-				    arc_insn_get_memory_offset (insn),
-				    info))
+		if (arc_insn_operand_is_reg (insn, 0))
+		  {
+		    /* st.a <reg>, [sp,<offset>] */
+
+		    if (arc_is_callee_saved (gdbarch,
+				  arc_insn_get_operand_reg (insn, 0),
+				  arc_insn_get_memory_offset (insn),
+				  info))
 			{
 			  /* This is a push onto the stack.  */
 			  info->delta_sp += arc_insn_get_memory_offset (insn);
 			  return TRUE;
 			}
-		    }
-		}
+		  }
 	    }
 	}
       else
@@ -1127,7 +1125,23 @@ arc_is_in_prologue (struct gdbarch *gdbarch,
 	}
     }
 
-  return FALSE;
+  /* stop only for non-call branch instructions
+     Recognized branch instructions:
+     inst:     opcode:      subopcode1:      subopcode2:
+     Bcc          0x00
+     BRcc_s       0x1D
+     Bcc_s        0x1E
+     BRcc         0x01             0x01             0x01
+     Jcc          0x04             0x20
+     Jcc_s        0x1F             0x00             0x07
+  */
+  if (insn->opcode == 0x00 || insn->opcode == 0x1D || insn->opcode == 0x1E ||
+      (insn->opcode == 0x01 && insn->subopcode1 == 0x01 && insn->subopcode2 == 0x01) ||
+      (insn->opcode == 0x04 && insn->subopcode1 == 0x20) ||
+      (insn->opcode == 0x0F && insn->subopcode1 == 0x00 && insn->subopcode2 == 0x07))
+    return FALSE;
+
+  return TRUE;
 
 }	/* arc_is_in_prologue () */
 

@@ -1,3 +1,8 @@
+2017-05-10  Guy Benyei  <guy.benyei@mellanox.com>
+	* arc-linux-tdep.c: Fix arc backtracing from signal handlers and
+	coredump.
+	* arc-tdep.c: Likewise.
+
 2016-10-07  Joel Brobecker  <brobecker@adacore.com>
 
 	* version.in: Set GDB version number to 7.12.0.DATE-git.

@@ -129,7 +129,7 @@ static const int arc_linux_sc_reg_offset[] = {
   REGISTER_NOT_PRESENT,  	/* limm     */
   REGISTER_NOT_PRESENT,  	/* pcl      */
 
-  REGISTER_NOT_PRESENT,  	/* stop_pc  */
+  6 * BYTES_IN_REGISTER,  	/* stop_pc  */
   2 * BYTES_IN_REGISTER,	/* lp_start */
   3 * BYTES_IN_REGISTER,	/* lp_end   */
   5 * BYTES_IN_REGISTER,	/* status32 */
@@ -588,8 +588,8 @@ arc_linux_is_sigtramp (struct frame_info *this_frame)
       0x6f, 0x22, 0x3f, 0x00		/* swi */
     };
   static const gdb_byte arc_sigtramp_insns_be[] =
-    { 0x12, 0xc2, 0x20, 0x8a,		/* mov  r8,nr_rt_sigreturn */
-      0x00, 0x3f, 0x22, 0x6f		/* swi */
+    { 0x20, 0x8a, 0x12, 0xc2,		/* mov  r8,nr_rt_sigreturn */
+      0x22, 0x6f, 0x00, 0x3f		/* swi */
     };
 
   static const int INSNS_SIZE = sizeof (arc_sigtramp_insns_le);
@@ -641,7 +641,8 @@ arc_linux_is_sigtramp (struct frame_info *this_frame)
 static CORE_ADDR
 arc_linux_sigcontext_addr (struct frame_info *this_frame)
 {
-  return (CORE_ADDR) get_frame_sp (this_frame);
+  /* Yuck! Magic offset 0x94 derived from how structures sit on the stack.  */
+  return (CORE_ADDR) (get_frame_sp (this_frame) + 0x94);
 
 }	/* arc_linux_sigcontext_addr () */
 
